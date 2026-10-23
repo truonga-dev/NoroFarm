@@ -1,0 +1,28 @@
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+    image: norofarm/jenkins:lts
+    container_name: norofarm_jenkins
+    # Access to the Docker socket is equivalent to root access on the host.
+    # This setup is intended for a dedicated CI machine or local Docker Desktop.
+    user: root
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=true"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  jenkins_home:
+    name: ${JENKINS_HOME_VOLUME:-norofarm_jenkins_home}

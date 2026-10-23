@@ -1,0 +1,11 @@
+ansicolor
+aws-credentials
+credentials-binding
+docker-plugin
+docker-workflow
+git
+pipeline-aws
+pipeline-stage-view
+ssh-agent
+workflow-aggregator
+ws-cleanup
