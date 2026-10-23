@@ -1,47 +1,39 @@
-# Tables Dictionary (Từ điển các Bảng)
+# Database Tables Dictionary
 
-## 1. Bảng `profiles` (Hồ sơ người dùng)
-Mở rộng từ bảng `auth.users` của Supabase. Cứ mỗi lần một User đăng ký ở `auth.users`, một Trigger tự động tạo 1 dòng tương ứng bên `profiles`.
-- `id` (UUID, Primary Key): Liên kết 1-1 với `auth.users.id`.
-- `full_name` (Text, Nullable).
-- `phone_number` (Text, Unique, Indexed).
-- `avatar_url` (Text, Nullable).
-- `updated_at` (Timestamp with time zone).
+Danh sách toàn bộ các bảng trong hệ thống NoroFarm. Hệ thống được chuẩn hóa, sử dụng Supabase PostgreSQL. Tất cả các bảng đều mặc định sử dụng `UUID` cho khóa chính và các trường thời gian `created_at`, `updated_at`.
 
-## 2. Bảng `commodities` (Danh mục Hàng hóa)
-Lưu trữ danh sách nông sản (Cà phê, Hồ tiêu).
-- `id` (Text, Primary Key): Ví dụ: `coffee_robusta`.
-- `name` (Text, Not Null): Tên hiển thị.
-- `unit` (Text, Not Null): Đơn vị tính (VD: `VNĐ/kg`).
-- `is_active` (Boolean, Default `true`).
+## 1. Người Dùng và Phân Quyền (RBAC)
+- **`users`**: Chứa thông tin đăng nhập cốt lõi (tích hợp được với Auth của Supabase).
+- **`profiles`**: Thông tin cá nhân hóa của user (họ tên, sdt, địa chỉ). Quan hệ 1-1 với `users`.
+- **`roles`**, **`permissions`**, **`user_roles`**, **`role_permissions`**: Cấu trúc phân quyền Role-based Access Control tiêu chuẩn. Cho phép gán linh hoạt nhiều quyền cho role, nhiều role cho user.
 
-## 3. Bảng `regions` (Khu vực / Tỉnh thành)
-Lưu trữ các vùng nguyên liệu.
-- `id` (Text, Primary Key): Ví dụ: `dak_lak`.
-- `name` (Text, Not Null).
-- `parent_id` (Text, Nullable, Foreign Key -> `regions.id`): Để chia cấp Huyện thuộc Tỉnh.
-- `lat`, `lon` (Numeric): Tọa độ phục vụ bản đồ và thời tiết.
+## 2. Nông Sản và Giá Cả
+- **`commodity_categories`**: Phân loại nông sản (Cây công nghiệp, Cây ăn quả...).
+- **`commodities`**: Thông tin chi tiết mặt hàng nông sản (Tên, đơn vị tính, mô tả).
+- **`price_sources`**: Nguồn cung cấp giá (doanh nghiệp, thương lái, đại lý).
+- **`commodity_prices`**: Giá cả nông sản cập nhật theo thời gian thực (Time-series data). Có lưu vết mức giá, nguồn giá và thay đổi so với lần trước.
+- **`commodity_price_history`**: Dữ liệu giá được tổng hợp theo ngày (Aggregation), dùng cho việc vẽ biểu đồ hiệu suất cao thay vì query trên bảng giá realtime.
 
-## 4. Bảng `prices` (Lịch sử Giá cả)
-Bảng có lượng dữ liệu phình to nhanh nhất.
-- `id` (UUID, Primary Key).
-- `commodity_id` (Text, Foreign Key -> `commodities.id`, Not Null).
-- `region_id` (Text, Foreign Key -> `regions.id`, Not Null).
-- `price` (Numeric, Not Null).
-- `valid_from` (Timestamp, Not Null): Thời điểm chốt giá.
-- Tự động tạo Partition (Phân mảnh) theo Tháng hoặc Năm khi dữ liệu vượt 10 triệu dòng.
+## 3. Thời Tiết
+- **`weather_locations`**: Điểm thu thập dữ liệu thời tiết (map với tỉnh/huyện).
+- **`weather_current`**: Thời tiết thời gian thực mới nhất tại location.
+- **`weather_forecast`**: Dự báo thời tiết theo ngày trong tương lai.
+- **`weather_alerts`**: Cảnh báo thời tiết cực đoan (hạn hán, ngập mặn, bão).
 
-## 5. Bảng `news` (Tin tức)
-- `id` (UUID, Primary Key).
-- `title` (Text, Not Null).
-- `slug` (Text, Unique, Not Null): Phục vụ SEO URL.
-- `content` (Text): Nội dung (Lưu dưới dạng Markdown hoặc HTML).
-- `thumbnail_url` (Text).
-- `published_at` (Timestamp).
+## 4. Tin Tức và Xu Hướng
+- **`news`**, **`news_categories`**, **`news_tags`**, **`news_tag_map`**: Cấu trúc CMS tiêu chuẩn để đăng tải các bài phân tích thị trường. Có chức năng lưu nháp, xuất bản, gắn thẻ (Many-to-Many).
+- **`market_trends`**, **`trend_history`**: Dự báo xu hướng giá và đánh giá độ chính xác của dự báo theo thời gian.
 
-## 6. Bảng `user_favorites` (Sở thích cá nhân)
-Người dùng "ghim" Tỉnh thành hoặc Nông sản lên màn hình Dashboard.
-- `id` (UUID, Primary Key).
-- `user_id` (UUID, Foreign Key -> `profiles.id`).
-- `entity_type` (Text): Loại đối tượng (`COMMODITY` hoặc `REGION`).
-- `entity_id` (Text).
+## 5. Danh Mục Hành Chính
+- **`provinces`**, **`districts`**: Dữ liệu danh mục Tỉnh/Thành phố và Quận/Huyện của Việt Nam.
+
+## 6. Cấu Hình và Giao Tiếp
+- **`settings`**: Lưu trữ cấu hình dạng JSONB (mềm dẻo) cho toàn bộ ứng dụng.
+- **`banners`**, **`announcements`**: Quản lý banner quảng cáo và thông báo hệ thống trên website.
+- **`contact_messages`**, **`newsletter_subscribers`**: Nhận feedback và quản lý tập người dùng theo dõi bản tin.
+
+## 7. Audit (Log Hệ Thống)
+- **`audit_logs`**: Ghi lại mọi thao tác quan trọng (Insert/Update/Delete) để tracking truy vết.
+
+## Chú ý (Soft Deletes)
+Hệ thống triển khai *Soft Delete* ở các bảng quan trọng (users, commodities, news) thông qua cột `deleted_at`. Dữ liệu sẽ không bị xóa vật lý mà chỉ được đánh dấu là đã xóa.

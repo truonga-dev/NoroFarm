@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: norofarm_backend_dev
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - ENVIRONMENT=development
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - backend_uploads_dev:/app/uploads
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - norofarm_dev_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: norofarm_frontend_dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: ["npm", "run", "dev"]
+    depends_on:
+      - backend
+    networks:
+      - norofarm_dev_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: norofarm_redis_dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - norofarm_dev_network
+
+volumes:
+  backend_uploads_dev:
+  redis_data_dev:
+
+networks:
+  norofarm_dev_network:
+    driver: bridge

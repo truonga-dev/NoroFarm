@@ -1,0 +1,40 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyrefly/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Runtime data and logs
+uploads/
+*.log
+logs/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/settings.json
+

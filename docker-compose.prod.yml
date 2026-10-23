@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: norofarm_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - backend_uploads:/app/uploads:ro
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - norofarm_network
+
+  frontend:
+    image: ${ECR_REGISTRY:-norofarm}/norofarm-frontend:latest
+    container_name: norofarm_frontend
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    networks:
+      - norofarm_network
+
+  backend:
+    image: ${ECR_REGISTRY:-norofarm}/norofarm-backend:latest
+    container_name: norofarm_backend
+    restart: always
+    env_file:
+      - .env.production
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+    expose:
+      - "8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - norofarm_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: norofarm_redis
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+    networks:
+      - norofarm_network
+
+volumes:
+  backend_uploads:
+    name: norofarm_backend_uploads
+  redis_data:
+    name: norofarm_redis_data
+  certbot_etc:
+    name: norofarm_certbot_etc
+  certbot_var:
+    name: norofarm_certbot_var
+
+networks:
+  norofarm_network:
+    name: norofarm_network
+    driver: bridge
