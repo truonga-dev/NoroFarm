@@ -1,7 +1,10 @@
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import String, Boolean, ForeignKey, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.commodity import Commodity
 
 user_role = Table(
     "user_role",

@@ -1,8 +1,11 @@
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime, timezone
 from sqlalchemy import String, ForeignKey, Text, Boolean, DateTime, Integer, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 class Banner(Base):
     """

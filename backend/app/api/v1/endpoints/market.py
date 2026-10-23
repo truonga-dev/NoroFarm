@@ -53,6 +53,8 @@ async def get_market_post(
     """Lấy chi tiết tin đăng"""
     service = MarketService(db)
     post = await service.get_post(post_id)
+    if not post.is_active or post.status != PostStatus.APPROVED:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tin đăng")
     return success_response(data=post)
 
 @router.post("", response_model=ResponseModel[MarketPostResponse], status_code=status.HTTP_201_CREATED)

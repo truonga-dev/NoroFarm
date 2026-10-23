@@ -3,7 +3,17 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from app.models.market import PostType, PostStatus
 from app.schemas.commodity import CommodityResponse
-from app.schemas.user import UserResponse
+
+class MarketAuthorProfile(BaseModel):
+    full_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+class MarketAuthorResponse(BaseModel):
+    id: int
+    profile: Optional[MarketAuthorProfile] = None
+
+    model_config = {"from_attributes": True}
 
 class MarketPostBase(BaseModel):
     commodity_id: int
@@ -39,7 +49,7 @@ class MarketPostResponse(MarketPostBase):
     
     # Nested relations if needed
     commodity: Optional[CommodityResponse] = None
-    user: Optional[UserResponse] = None
+    user: Optional[MarketAuthorResponse] = None
 
     model_config = {"from_attributes": True}
 

@@ -96,6 +96,29 @@ Cho mỗi buổi: mã ẩn danh, vai trò/vùng/ngành hàng, giao dịch gần 
 
 Cho mỗi quyết định thiết kế: vấn đề, đối tượng, bằng chứng (mã buổi/quan sát), phương án, rủi ro, người quyết định, ngày, trạng thái cần xác minh. Mọi kết luận từ một người cần ghi rõ mức độ tin cậy thấp.
 
+## 8. Bản đồ năng lực hiện tại và lát cắt phát triển đề xuất
+
+Đây là **bản đồ từ mã nguồn**, không xác nhận quy trình nghiệp vụ thực tế. `MarketPost` là tin mua/bán có kiểm duyệt; `Order` và `PaymentTransaction` thuộc cửa hàng sản phẩm riêng. Chưa có liên kết giữa bài đăng và báo giá/đơn hàng B2B. Vì vậy giao diện hiện có không được mô tả như một hệ thống giao dịch B2B trọn vẹn.
+
+| Bước giao dịch | Hiện có trong mã nguồn | Khoảng trống cần quyết định/kiểm chứng |
+| --- | --- | --- |
+| Tìm nguồn hàng/nhu cầu mua | Danh sách bài đăng, lọc loại tin/mặt hàng/từ khóa, kiểm duyệt | Vùng, phẩm cấp, thời điểm giao, tính sẵn có, cách xác minh và công khai thông tin liên hệ |
+| Liên hệ và báo giá | Số điện thoại trên tin đăng | Yêu cầu báo giá có cấu trúc, lịch sử thương lượng, ai được xem dữ liệu, hết hạn báo giá |
+| Chốt đơn | Đơn hàng cho sản phẩm cửa hàng, không tham chiếu `MarketPost` | Xác nhận hai phía, số lượng thực, biến động giá, điều kiện giao nhận, hủy/đổi |
+| Hợp đồng | Chưa thấy mô hình hợp đồng B2B | Mẫu điều khoản, phiên bản, người có thẩm quyền ký, lưu trữ, tư vấn pháp lý |
+| Vận chuyển/nhận hàng | Trạng thái giao hàng của đơn cửa hàng | Bàn giao, kiểm định, thiếu hụt, chứng từ, đối soát thực nhận |
+| Thanh toán | Stripe session/webhook cho đơn cửa hàng | Phương thức phù hợp giao dịch B2B, đặt cọc, thanh toán nhiều đợt, hoàn tiền, đối soát, trách nhiệm pháp lý |
+| Hậu mãi/tranh chấp | Chưa thấy luồng gắn với bài đăng | Bằng chứng, thời hạn phản hồi, phân xử, quyền truy cập và lưu giữ dữ liệu |
+
+**Lát cắt đề xuất, chưa cam kết xây dựng:**
+
+1. **Nền tin cậy và dữ liệu lô hàng:** sửa lỗi hợp đồng API hiện hữu; xác định trường tối thiểu, trạng thái dữ liệu, quyền truy cập và nguồn xác minh. Đây là nền cho mọi bước sau.
+2. **Yêu cầu báo giá có cấu trúc:** chỉ thiết kế khi xác nhận cách hai phía thương lượng thật và phạm vi dữ liệu cần giữ trên nền tảng. Mục tiêu là đo được một cơ hội giao dịch đủ điều kiện.
+3. **Đơn B2B và hợp đồng:** cần xác nhận vai trò tổ chức, điều khoản, quyền duyệt/ký, trách nhiệm vận hành. Không dùng lại đơn cửa hàng chỉ vì đã có bảng `orders`.
+4. **Thanh toán và đối soát:** chỉ tiến hành sau khi có đối tác/quy trình phù hợp, đánh giá pháp lý, mô hình xử lý sai lệch và thử nghiệm bảo mật. Không suy từ việc tích hợp Stripe B2C rằng B2B đã sẵn sàng.
+
+**Việc kỹ thuật có bằng chứng trực tiếp:** biểu mẫu đăng tin từng gửi `content` trong khi `MarketPostCreate` nhận `description`; đã đồng bộ frontend vào `description`. API chi tiết công khai trước đây lấy bài theo ID không xét trạng thái; nay chỉ trả bài đang hoạt động và đã duyệt. `MarketPostResponse` trước đây lồng `UserResponse` (gồm email và số điện thoại hồ sơ); nay chỉ trả ID và tên hiển thị tác giả. Số liên hệ được nhập trực tiếp trên tin vẫn công khai theo hành vi cũ; cần kiểm chứng đồng ý chia sẻ và chính sách quyền riêng tư trước khi mở rộng. TypeScript đã kiểm tra; vẫn cần kiểm thử backend và luồng thực trong môi trường chạy được.
+
 ## Tham khảo phương pháp
 
 - [GOV.UK Service Manual — Discovery phase](https://www.gov.uk/service-manual/agile-delivery/how-the-discovery-phase-works): khám phá vấn đề, người dùng, hành trình và ràng buộc trước khi cam kết giải pháp.
