@@ -46,7 +46,7 @@ pipeline {
                 stage('Backend lint') {
                     steps {
                         sh '''
-                            docker run --rm -v "$PWD/backend:/app" -w /app python:3.13-slim \
+                            docker run --rm -v norofarm_jenkins_home:/var/jenkins_home -w "$WORKSPACE/backend" python:3.13-slim \
                               bash -c "pip install --no-cache-dir ruff && ruff check app/"
                         '''
                     }
@@ -54,7 +54,7 @@ pipeline {
                 stage('Frontend lint') {
                     steps {
                         sh '''
-                            docker run --rm -v "$PWD/frontend:/app" -w /app node:20-alpine \
+                            docker run --rm -v norofarm_jenkins_home:/var/jenkins_home -w "$WORKSPACE/frontend" node:20-alpine \
                               sh -c "npm ci && npm run lint"
                         '''
                     }
@@ -68,7 +68,7 @@ pipeline {
             }
             steps {
                 sh '''
-                    docker run --rm -v "$PWD/backend:/app" -w /app \
+                    docker run --rm -v norofarm_jenkins_home:/var/jenkins_home -w "$WORKSPACE/backend" \
                       -e ENVIRONMENT=test \
                       -e SECRET_KEY=ci-only-secret-key-not-used-outside-tests \
                       python:3.13-slim \

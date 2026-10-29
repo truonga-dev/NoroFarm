@@ -1,6 +1,6 @@
 FROM docker:29-cli AS docker_cli
 
-FROM jenkins/jenkins:lts-jdk21
+FROM jenkins/jenkins:2.587-jdk21
 
 USER root
 
