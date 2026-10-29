@@ -1,8 +1,26 @@
-import pytest
-from httpx import AsyncClient
-from app.main import app
+import os
 
-@pytest.fixture
+os.environ.setdefault("SUPABASE_DB_URL", "sqlite+aiosqlite:///./test.db")
+
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+
+from app.database.session import engine
+from app.main import app
+from app.models import Base
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def prepare_database():
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    yield
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

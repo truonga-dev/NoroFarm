@@ -72,7 +72,7 @@ pipeline {
                       -e ENVIRONMENT=test \
                       -e SECRET_KEY=ci-only-secret-key-not-used-outside-tests \
                       python:3.13-slim \
-                      bash -c "pip install --no-cache-dir -r requirements.txt && pytest tests/ -v"
+                      bash -c "pip install --no-cache-dir -r requirements.txt && python -m pytest tests/ -v"
                 '''
             }
         }
