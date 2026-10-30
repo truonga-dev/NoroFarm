@@ -49,10 +49,13 @@ export const useAuth = () => {
     } catch (e) {
       console.error('Logout failed on backend', e);
     }
+    // Xóa triệt để cả cookie ở phía client và local storage
+    document.cookie = 'access_token=; Max-Age=0; path=/;';
+    document.cookie = 'refresh_token=; Max-Age=0; path=/;';
     logout();
     useCartStore.getState().clearCart();
     queryClient.clear();
-    window.location.href = '/login';
+    window.location.replace('/login');
   };
 
   // Helper: extract error message from native fetch ApiError

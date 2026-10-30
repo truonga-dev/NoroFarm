@@ -28,6 +28,7 @@ async def login(data: Login, response: Response, db: AsyncSession = Depends(get_
         httponly=True,
         secure=False,
         samesite="lax",
+        path="/",
         max_age=30 * 24 * 3600,  # 30 days
     )
     if token.refresh_token:
@@ -37,6 +38,7 @@ async def login(data: Login, response: Response, db: AsyncSession = Depends(get_
             httponly=True,
             secure=False,
             samesite="lax",
+            path="/",
             max_age=7 * 24 * 3600,  # 7 days
         )
 
@@ -45,18 +47,19 @@ async def login(data: Login, response: Response, db: AsyncSession = Depends(get_
 
 @router.post("/logout", response_model=ResponseModel[None])
 async def logout(response: Response):
-    is_prod = settings.ENVIRONMENT == "production"
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=is_prod,
-        samesite="lax"
+        secure=False,
+        samesite="lax",
+        path="/"
     )
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=is_prod,
-        samesite="lax"
+        secure=False,
+        samesite="lax",
+        path="/"
     )
     return success_response(data=None, message="Đăng xuất thành công")
 

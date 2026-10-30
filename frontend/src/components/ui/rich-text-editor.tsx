@@ -1,19 +1,15 @@
 "use client"
 
-import React, { useMemo } from "react"
-import dynamic from "next/dynamic"
+import React from "react"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/toast-context"
-import { Loader2 } from "lucide-react"
+import { 
+  Bold, Italic, Underline, List, ListOrdered, 
+  Heading1, Heading2, Heading3, Link as LinkIcon, 
+  Image as ImageIcon, Loader2 
+} from "lucide-react"
 import { newsService } from "@/api/services/news.service"
 import { getAssetUrl } from "@/api/client"
-// CSS được import trong global.css hoặc layout để tránh lỗi SSR
-
-// Tải ReactQuill động để tránh lỗi SSR (document is not defined)
-const ReactQuill = dynamic(() => import("react-quill"), { 
-  ssr: false,
-  loading: () => <div className="h-[300px] flex items-center justify-center border rounded-xl bg-card"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-}) as any
 
 interface RichTextEditorProps {
   value: string
@@ -22,12 +18,39 @@ interface RichTextEditorProps {
   className?: string
 }
 
-export function RichTextEditor({ value, onChange, placeholder = "Nhập nội dung bài viết...", className }: RichTextEditorProps) {
-  const quillRef = React.useRef<any>(null)
+export function RichTextEditor({ 
+  value, 
+  onChange, 
+  placeholder = "Nhập nội dung bài viết...", 
+  className 
+}: RichTextEditorProps) {
+  const editorRef = React.useRef<HTMLDivElement>(null)
+  const [isUploading, setIsUploading] = React.useState(false)
   const toast = useToast()
 
-  // Xử lý upload ảnh khi bấm nút Image trong Toolbar
-  const imageHandler = React.useCallback(() => {
+  // Đồng bộ giá trị khởi tạo vào contentEditable
+  React.useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      if (document.activeElement !== editorRef.current) {
+        editorRef.current.innerHTML = value || ""
+      }
+    }
+  }, [value])
+
+  const executeCommand = (command: string, arg: string | undefined = undefined) => {
+    document.execCommand(command, false, arg)
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
+    }
+  }
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML)
+    }
+  }
+
+  const handleImageUpload = () => {
     const input = document.createElement("input")
     input.setAttribute("type", "file")
     input.setAttribute("accept", "image/*")
@@ -37,51 +60,133 @@ export function RichTextEditor({ value, onChange, placeholder = "Nhập nội du
       const file = input.files ? input.files[0] : null
       if (!file) return
 
+      setIsUploading(true)
       try {
         const res: any = await newsService.uploadImage(file)
         const uploadedUrl = res?.data?.url || res?.url
         if (!uploadedUrl) throw new Error("Upload failed")
         
         const url = getAssetUrl(uploadedUrl)
-
-        const quill = quillRef.current?.getEditor()
-        if (quill) {
-          const range = quill.getSelection()
-          quill.insertEmbed(range?.index || 0, "image", url)
-        }
+        executeCommand("insertImage", url)
+        toast.success("Đã chèn ảnh vào bài viết")
       } catch (error) {
         toast.error("Lỗi khi tải ảnh lên")
+      } finally {
+        setIsUploading(false)
       }
     }
-  }, [toast])
-  
-  // Custom toolbar
-  const modules = useMemo(() => ({
-    toolbar: {
-      container: [
-        [{ 'header': [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-        ['link', 'image', 'video'],
-        [{ 'color': [] }, { 'background': [] }],
-        ['clean']
-      ],
-      handlers: {
-        image: imageHandler
-      }
+  }
+
+  const handleLink = () => {
+    const url = prompt("Nhập đường dẫn URL:")
+    if (url) {
+      executeCommand("createLink", url)
     }
-  }), [imageHandler])
+  }
 
   return (
-    <div className={cn("rich-text-container", className)}>
-      <ReactQuill 
-        ref={quillRef}
-        theme="snow" 
-        value={value} 
-        onChange={onChange} 
-        placeholder={placeholder}
-        modules={modules}
-        className="bg-card rounded-xl overflow-hidden [&_.ql-toolbar]:rounded-t-xl [&_.ql-toolbar]:border-border [&_.ql-toolbar]:bg-muted/30 [&_.ql-container]:rounded-b-xl [&_.ql-container]:border-border [&_.ql-editor]:min-h-[300px] [&_.ql-editor]:text-base"
+    <div className={cn("rounded-xl border border-border bg-card overflow-hidden shadow-sm", className)}>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/40 p-2">
+        <button
+          type="button"
+          onClick={() => executeCommand("formatBlock", "<h1>")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Tiêu đề 1"
+        >
+          <Heading1 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => executeCommand("formatBlock", "<h2>")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Tiêu đề 2"
+        >
+          <Heading2 className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => executeCommand("formatBlock", "<h3>")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Tiêu đề 3"
+        >
+          <Heading3 className="w-4 h-4" />
+        </button>
+
+        <div className="h-4 w-px bg-border mx-1" />
+
+        <button
+          type="button"
+          onClick={() => executeCommand("bold")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="In đậm (Ctrl+B)"
+        >
+          <Bold className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => executeCommand("italic")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="In nghiêng (Ctrl+I)"
+        >
+          <Italic className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => executeCommand("underline")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Gạch chân (Ctrl+U)"
+        >
+          <Underline className="w-4 h-4" />
+        </button>
+
+        <div className="h-4 w-px bg-border mx-1" />
+
+        <button
+          type="button"
+          onClick={() => executeCommand("insertUnorderedList")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Danh sách dấu đầu dòng"
+        >
+          <List className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => executeCommand("insertOrderedList")}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Danh sách đánh số"
+        >
+          <ListOrdered className="w-4 h-4" />
+        </button>
+
+        <div className="h-4 w-px bg-border mx-1" />
+
+        <button
+          type="button"
+          onClick={handleLink}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors"
+          title="Chèn liên kết"
+        >
+          <LinkIcon className="w-4 h-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleImageUpload}
+          disabled={isUploading}
+          className="p-1.5 rounded-lg hover:bg-background text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          title="Chèn ảnh"
+        >
+          {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-primary" /> : <ImageIcon className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Editable Content Area */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        className="min-h-[300px] p-4 text-base text-foreground focus:outline-none prose dark:prose-invert max-w-none [&_img]:rounded-xl [&_img]:max-w-full [&_img]:my-3"
+        data-placeholder={placeholder}
       />
     </div>
   )
