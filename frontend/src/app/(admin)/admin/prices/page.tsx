@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { commoditiesService } from "@/api/services/commodities.service"
 import { useToast } from "@/components/ui/toast-context"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 export default function AdminPricesPage() {
   const [search, setSearch] = React.useState("")
@@ -154,15 +155,7 @@ export default function AdminPricesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quản lý Giá Nông sản</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Quản lý và cập nhật giá các mặt hàng nông sản trên thị trường
-          </p>
-        </div>
-        
-        <div className="flex gap-2 items-center">
+      <AdminPageHeader eyebrow="Dữ liệu thị trường" title="Quản lý giá nông sản" description="Quản lý mặt hàng, cập nhật báo giá và nhập dữ liệu theo lô." actions={<div className="flex flex-wrap items-center gap-2">
           <div>
             <Label htmlFor="csv-upload" className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 shadow-sm">
               <Upload className="w-4 h-4 mr-2" />
@@ -180,7 +173,7 @@ export default function AdminPricesPage() {
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 shadow-md">
+              <Button>
                 <Plus className="w-4 h-4 mr-2" />
                 Thêm mặt hàng
               </Button>
@@ -226,10 +219,9 @@ export default function AdminPricesPage() {
               </form>
             </DialogContent>
           </Dialog>
-          </div>
-        </div>
+          </div>} />
 
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-background p-4 rounded-xl border shadow-sm">
+      <AdminToolbar>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
           <TabsList className="grid w-full grid-cols-3 h-10">
             <TabsTrigger value="all">Tất cả</TabsTrigger>
@@ -241,7 +233,7 @@ export default function AdminPricesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Tìm kiếm mặt hàng..." 
-            className="pl-9 h-10 bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:bg-background transition-all"
+            className="h-10 pl-9"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -249,9 +241,10 @@ export default function AdminPricesPage() {
             }}
           />
         </div>
-      </div>
+        <p className="text-sm text-muted-foreground md:ml-auto">{filteredItems.length} mặt hàng</p>
+      </AdminToolbar>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -276,9 +269,7 @@ export default function AdminPricesPage() {
                 ))
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                    Không tìm thấy mặt hàng nào.
-                  </td>
+                  <td colSpan={5}><AdminEmptyState title="Không tìm thấy mặt hàng" description="Thử thay đổi nhóm hàng hoặc từ khóa tìm kiếm." /></td>
                 </tr>
               ) : (
                 filteredItems.map((item: any) => {
@@ -392,7 +383,7 @@ export default function AdminPricesPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
     </div>
   )
 }

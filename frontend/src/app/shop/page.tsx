@@ -1,148 +1,320 @@
-"use client"
+'use client'
 
-import * as React from "react"
-import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
-import { Search, ShoppingCart, Filter, Package } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/toast-context"
-import { shopService } from "@/api/services/shop.service"
-import { useCartStore } from "@/store/useCartStore"
-import { PageTitle } from "@/components/layout/page-title"
-import { getAssetUrl } from "@/api/client"
+import * as React from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, Package, Search, ShoppingCart } from 'lucide-react'
+
+import { getAssetUrl } from '@/api/client'
+import { shopService } from '@/api/services/shop.service'
+import { DataState } from '@/components/data-display/data-state'
+import { PageTitle } from '@/components/layout/page-title'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useToast } from '@/components/ui/toast-context'
+import { useAuthStore } from '@/store/authStore'
+import { useCartStore } from '@/store/useCartStore'
 
 export default function ShopPage() {
-  const [search, setSearch] = React.useState("")
-  const [category, setCategory] = React.useState<number | undefined>(undefined)
-  const [page, setPage] = React.useState(1)
-  
+  const router = useRouter()
   const toast = useToast()
-  const addItem = useCartStore(state => state.addItem)
-  const cartItemCount = useCartStore(state => state.getItemCount())
+  const { isAuthenticated, user } = useAuthStore()
+  const addItem = useCartStore((state) => state.addItem)
+  const cartItemCount = useCartStore((state) => state.getItemCount())
+  const cartTotal = useCartStore((state) => state.getTotal())
+
+  const [search, setSearch] = React.useState('')
+  const [category, setCategory] = React.useState<number | undefined>()
+  const [sortBy, setSortBy] = React.useState('default')
+  const [farmArea, setFarmArea] = React.useState('1')
 
   const { data: categoriesData } = useQuery({
-    queryKey: ["shop-categories"],
-    queryFn: () => shopService.getCategories()
+    queryKey: ['shop-categories'],
+    queryFn: () => shopService.getCategories(),
   })
-  const categories = categoriesData?.data || []
 
-  const { data: productsData, isLoading } = useQuery({
-    queryKey: ["shop-products", page, search, category],
-    queryFn: () => shopService.getProducts({ page, size: 20, search: search || undefined, category_id: category })
+  const {
+    data: productsData,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
+    queryKey: ['shop-products', search, category],
+    queryFn: () =>
+      shopService.getProducts({
+        page: 1,
+        size: 40,
+        search: search || undefined,
+        category_id: category,
+      }),
   })
-  const products = productsData?.data?.items || []
+
+  const categories: any[] = categoriesData?.data || []
+  const products = React.useMemo(() => {
+    const rawProducts: any[] = productsData?.data?.items || []
+    return [...rawProducts].sort((a, b) => {
+      if (sortBy === 'price_asc')
+        return Number(a.price || 0) - Number(b.price || 0)
+      if (sortBy === 'price_desc')
+        return Number(b.price || 0) - Number(a.price || 0)
+      if (sortBy === 'in_stock')
+        return Number(b.stock || 0) - Number(a.stock || 0)
+      return 0
+    })
+  }, [productsData, sortBy])
+
+  const area = Math.max(0.1, Number(farmArea) || 1)
 
   const handleAddToCart = (product: any) => {
+    if (!isAuthenticated || !user) {
+      toast.info('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.')
+      router.push('/login?redirect=/shop')
+      return
+    }
     if (product.stock <= 0) {
-      toast.error("Sản phẩm đã hết hàng!")
+      toast.error('Sản phẩm hiện đã hết hàng.')
       return
     }
     addItem(product, 1)
-    toast.success(`Đã thêm ${product.name} vào giỏ hàng`)
+    toast.success(`Đã thêm ${product.name} vào giỏ hàng.`)
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <PageTitle title="Cửa Hàng Nông Sản" description="Mua sắm các sản phẩm chính hãng, chất lượng cao từ NoroFarm." className="pb-0" />
-        <Button asChild className="bg-primary hover:bg-primary/90 shadow-md">
-          <Link href="/checkout">
-            <ShoppingCart className="w-5 h-5 mr-2" />
-            Giỏ hàng ({cartItemCount})
+    <div className="mx-auto max-w-7xl space-y-7 px-4 pb-14 sm:px-6 lg:px-8">
+      <div className="border-border flex flex-col gap-5 border-b pb-7 md:flex-row md:items-end md:justify-between">
+        <PageTitle
+          title="Cửa hàng vật tư nông nghiệp"
+          description="Phân bón, hạt giống và vật tư phục vụ sản xuất, trình bày rõ giá bán và lượng hàng còn lại."
+          className="pb-0"
+        />
+        <Button
+          asChild
+          variant="outline"
+          className="h-11 shrink-0 justify-between gap-4 md:min-w-52"
+        >
+          <Link
+            href={
+              isAuthenticated && user
+                ? '/checkout'
+                : '/login?redirect=/checkout'
+            }
+          >
+            <span className="flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4" />
+              Giỏ hàng ({isAuthenticated && user ? cartItemCount : 0})
+            </span>
+            <ChevronRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 bg-background p-4 rounded-xl border shadow-sm sticky top-16 z-10">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Tìm kiếm sản phẩm..." 
-            className="pl-9 bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:bg-background"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          />
-        </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-          <Button 
-            variant={category === undefined ? "default" : "outline"} 
-            onClick={() => { setCategory(undefined); setPage(1); }}
-            className="whitespace-nowrap"
-          >
-            Tất cả
-          </Button>
-          {categories.map((c: any) => (
-            <Button 
-              key={c.id}
-              variant={category === c.id ? "default" : "outline"} 
-              onClick={() => { setCategory(c.id); setPage(1); }}
-              className="whitespace-nowrap"
-            >
-              {c.name}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-background rounded-xl border shadow-sm p-4 h-[300px] animate-pulse flex flex-col">
-              <div className="w-full h-40 bg-muted rounded-lg mb-4"></div>
-              <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-              <div className="h-4 bg-muted rounded w-1/2"></div>
-            </div>
-          ))}
-        </div>
-      ) : products.length === 0 ? (
-        <div className="text-center py-20 bg-background rounded-xl border shadow-sm">
-          <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-semibold">Không tìm thấy sản phẩm</h3>
-          <p className="text-muted-foreground mt-1">Vui lòng thử từ khóa khác hoặc chọn danh mục khác.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product: any) => (
-            <div key={product.id} className="bg-background rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow group flex flex-col">
-              <Link href={`/shop/${product.id}`} className="block relative aspect-square overflow-hidden bg-muted">
-                {product.image_url ? (
-                  <img src={getAssetUrl(product.image_url)} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="w-12 h-12 text-muted-foreground/30" />
-                  </div>
-                )}
-                {product.stock <= 0 && (
-                  <div className="absolute inset-0 bg-background/80 flex items-center justify-center backdrop-blur-sm">
-                    <span className="bg-red-500 text-white px-3 py-1 rounded-full font-bold text-sm">Hết hàng</span>
-                  </div>
-                )}
-              </Link>
-              <div className="p-4 flex flex-col flex-1">
-                <div className="text-xs text-muted-foreground mb-1">{product.category?.name || "Chưa phân loại"}</div>
-                <Link href={`/shop/${product.id}`} className="font-semibold hover:text-primary transition-colors line-clamp-2 flex-1">
-                  {product.name}
-                </Link>
-                <div className="mt-4 flex items-end justify-between">
-                  <div>
-                    <div className="text-primary font-bold text-lg">{product.price.toLocaleString("vi-VN")} đ</div>
-                    <div className="text-xs text-muted-foreground">/ {product.unit}</div>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleAddToCart(product)}
-                    disabled={product.stock <= 0}
-                    className="shrink-0"
-                  >
-                    <ShoppingCart className="w-4 h-4 mr-2" /> Thêm
-                  </Button>
-                </div>
+      <section
+        className="border-border bg-card rounded-xl border p-4 md:p-5"
+        aria-labelledby="material-estimator"
+      >
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div>
+            <h2 id="material-estimator" className="font-semibold">
+              Ước tính vật tư theo diện tích
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm leading-6">
+              Số liệu mang tính tham khảo ban đầu. Định mức thực tế còn phụ
+              thuộc cây trồng, đất và giai đoạn sinh trưởng.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              Diện tích (ha)
+              <Input
+                type="number"
+                min="0.1"
+                step="0.5"
+                value={farmArea}
+                onChange={(event) => setFarmArea(event.target.value)}
+                className="h-9 w-24"
+              />
+            </label>
+            <div className="bg-muted/60 grid grid-cols-2 gap-4 rounded-lg px-4 py-2.5 text-sm">
+              <div>
+                <span className="text-muted-foreground block text-xs">
+                  NPK loại 50 kg
+                </span>
+                <strong>
+                  {Math.round(area * 12)}–{Math.round(area * 16)} bao
+                </strong>
+              </div>
+              <div className="border-border border-l pl-4">
+                <span className="text-muted-foreground block text-xs">
+                  Hữu cơ vi sinh
+                </span>
+                <strong>
+                  {Math.round(area * 25)}–{Math.round(area * 35)} bao
+                </strong>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      )}
+      </section>
+
+      <section className="space-y-5" aria-label="Danh sách sản phẩm">
+        <div className="border-border bg-card grid gap-3 rounded-xl border p-3 md:grid-cols-[minmax(260px,1fr)_auto_auto]">
+          <div className="relative">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Tìm phân bón, hạt giống, dụng cụ..."
+              className="pl-9"
+            />
+          </div>
+          <select
+            value={category ?? 'all'}
+            onChange={(event) =>
+              setCategory(
+                event.target.value === 'all'
+                  ? undefined
+                  : Number(event.target.value)
+              )
+            }
+            className="border-input bg-background h-10 rounded-md border px-3 text-sm"
+            aria-label="Danh mục sản phẩm"
+          >
+            <option value="all">Tất cả danh mục</option>
+            {categories.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+            className="border-input bg-background h-10 rounded-md border px-3 text-sm"
+            aria-label="Sắp xếp sản phẩm"
+          >
+            <option value="default">Sắp xếp mặc định</option>
+            <option value="price_asc">Giá thấp đến cao</option>
+            <option value="price_desc">Giá cao đến thấp</option>
+            <option value="in_stock">Ưu tiên còn hàng</option>
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between text-sm">
+          <p className="text-muted-foreground">
+            {isLoading ? 'Đang tải sản phẩm...' : `${products.length} sản phẩm`}
+          </p>
+          {isAuthenticated && user && cartItemCount > 0 && (
+            <Link
+              href="/checkout"
+              className="text-primary font-semibold hover:underline"
+            >
+              Xem giỏ hàng · {cartTotal.toLocaleString('vi-VN')} đ
+            </Link>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={index}
+                className="border-border bg-card overflow-hidden rounded-xl border"
+              >
+                <div className="bg-muted aspect-[4/3] animate-pulse" />
+                <div className="space-y-3 p-4">
+                  <div className="bg-muted h-3 w-20 animate-pulse" />
+                  <div className="bg-muted h-5 w-4/5 animate-pulse" />
+                  <div className="bg-muted h-9 animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : isError ? (
+          <DataState
+            icon={<Package className="h-5 w-5" />}
+            title="Chưa thể tải danh sách sản phẩm"
+            description="Kết nối tới cửa hàng đang gặp sự cố. Bạn có thể thử tải lại."
+            action={
+              <Button variant="outline" onClick={() => refetch()}>
+                Tải lại
+              </Button>
+            }
+          />
+        ) : products.length === 0 ? (
+          <DataState
+            icon={<Package className="h-5 w-5" />}
+            title="Không tìm thấy sản phẩm"
+            description="Hãy thử từ khóa khác hoặc chọn lại danh mục."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {products.map((product) => (
+              <article
+                key={product.id}
+                className="group border-border bg-card flex overflow-hidden rounded-xl border"
+              >
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <Link
+                    href={`/shop/${product.id}`}
+                    className="bg-muted relative block aspect-[4/3] overflow-hidden"
+                  >
+                    {product.image_url ? (
+                      <img
+                        src={getAssetUrl(product.image_url)}
+                        alt={product.name}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Package className="text-muted-foreground/35 h-10 w-10" />
+                      </div>
+                    )}
+                    <span
+                      className={`absolute top-3 left-3 rounded-md px-2 py-1 text-xs font-semibold ${product.stock > 0 ? 'bg-background/90 text-foreground' : 'bg-destructive text-destructive-foreground'}`}
+                    >
+                      {product.stock > 0
+                        ? `Còn ${product.stock} ${product.unit}`
+                        : 'Hết hàng'}
+                    </span>
+                  </Link>
+                  <div className="flex flex-1 flex-col p-4">
+                    <p className="text-muted-foreground text-xs font-medium">
+                      {product.category?.name || 'Vật tư nông nghiệp'}
+                    </p>
+                    <Link
+                      href={`/shop/${product.id}`}
+                      className="hover:text-primary mt-1 line-clamp-2 leading-6 font-semibold"
+                    >
+                      {product.name}
+                    </Link>
+                    <div className="mt-auto flex items-end justify-between gap-3 pt-5">
+                      <div>
+                        <strong className="text-primary block text-lg">
+                          {Number(product.price).toLocaleString('vi-VN')} đ
+                        </strong>
+                        <span className="text-muted-foreground text-xs">
+                          mỗi {product.unit}
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAddToCart(product)}
+                        disabled={product.stock <= 0}
+                        aria-label={`Thêm ${product.name} vào giỏ`}
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        <span className="ml-2">Thêm</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   )
 }

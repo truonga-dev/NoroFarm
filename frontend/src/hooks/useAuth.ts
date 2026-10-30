@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '../api/services/auth.service';
 import { useAuthStore } from '../store/authStore';
+import { useCartStore } from '../store/useCartStore';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export const useAuth = () => {
@@ -49,6 +50,7 @@ export const useAuth = () => {
       console.error('Logout failed on backend', e);
     }
     logout();
+    useCartStore.getState().clearCart();
     queryClient.clear();
     window.location.href = '/login';
   };

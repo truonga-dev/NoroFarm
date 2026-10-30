@@ -63,17 +63,13 @@ async def create_market_post(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Tạo tin đăng mới (Chỉ Admin hoặc User có quyền seller)"""
-    # Kiểm tra quyền đăng bài
-    user_roles = [role.name for role in getattr(current_user, 'roles', [])]
-    if "admin" not in user_roles and "seller" not in user_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Bạn không có quyền đăng tin. Vui lòng liên hệ Admin để được cấp quyền bán sản phẩm."
-        )
-
+    """Tạo tin đăng mới cho thành viên đã đăng nhập"""
     service = MarketService(db)
     post = await service.create_post(current_user.id, data)
+    user_roles = [role.name for role in getattr(current_user, "roles", [])]
+    if "admin" in user_roles or "seller" in user_roles:
+        post.status = PostStatus.APPROVED
+        post = await service.repo.update_post(post)
     return success_response(data=post, message="Đăng tin thành công")
 
 @router.put("/{post_id}", response_model=ResponseModel[MarketPostResponse])

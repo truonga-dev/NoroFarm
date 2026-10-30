@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Plus, Search, Edit, Trash2, Package } from "lucide-react"
+import { Plus, Search, Edit, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/toast-context"
 import { shopService } from "@/api/services/shop.service"
 import { apiClient, getAssetUrl } from "@/api/client"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 export default function AdminProductsPage() {
   const [search, setSearch] = React.useState("")
@@ -35,7 +36,7 @@ export default function AdminProductsPage() {
     queryKey: ["shop-categories"],
     queryFn: () => shopService.getCategories()
   })
-  const categories = categoriesData?.data || []
+  const categories = React.useMemo(() => categoriesData?.data || [], [categoriesData?.data])
 
   const { data: productsData, isLoading } = useQuery({
     queryKey: ["shop-products", page, search],
@@ -150,22 +151,15 @@ export default function AdminProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Kho Sản Phẩm (B2C Shop)</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Quản lý các sản phẩm của NoroFarm bán trực tiếp cho nông dân.
-          </p>
-        </div>
-        
+      <AdminPageHeader eyebrow="Cửa hàng B2C" title="Kho sản phẩm" description="Quản lý danh mục, giá bán, tồn kho và trạng thái hiển thị sản phẩm." actions={
         <Dialog open={isDialogOpen} onOpenChange={(open) => {
           setIsDialogOpen(open)
           if (!open) resetForm()
         }}>
           <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 shadow-md">
+            <Button>
               <Plus className="w-4 h-4 mr-2" />
-              Thêm sản phẩm mới
+              Thêm sản phẩm
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -177,7 +171,7 @@ export default function AdminProductsPage() {
                 <Label>Tên sản phẩm</Label>
                 <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="VD: Phân bón NPK 20-20-15" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Danh mục</Label>
                   <select 
@@ -204,7 +198,7 @@ export default function AdminProductsPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Giá bán (VNĐ)</Label>
                   <Input required type="number" min="0" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} />
@@ -284,14 +278,14 @@ export default function AdminProductsPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      } />
 
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-background p-4 rounded-xl border shadow-sm">
+      <AdminToolbar>
         <div className="relative flex-1 w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Tìm kiếm sản phẩm..." 
-            className="pl-9 bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:bg-background"
+            className="pl-9"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -299,9 +293,10 @@ export default function AdminProductsPage() {
             }}
           />
         </div>
-      </div>
+        <p className="text-sm text-muted-foreground sm:ml-auto">{products.length} sản phẩm</p>
+      </AdminToolbar>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -317,7 +312,7 @@ export default function AdminProductsPage() {
               {isLoading ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Đang tải...</td></tr>
               ) : products.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Chưa có sản phẩm nào.</td></tr>
+                <tr><td colSpan={5}><AdminEmptyState title="Chưa có sản phẩm" description="Thêm sản phẩm đầu tiên để bắt đầu vận hành cửa hàng." /></td></tr>
               ) : (
                 products.map((item: any) => (
                   <tr key={item.id} className="hover:bg-muted/50 transition-colors">
@@ -358,7 +353,7 @@ export default function AdminProductsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
     </div>
   )
 }

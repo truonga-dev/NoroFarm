@@ -17,16 +17,65 @@ class CommodityCategory(Base):
 
 class Commodity(Base):
     __tablename__ = "commodity"
+    __table_args__ = (
+        Index("ix_commodity_category_fk", "category_id"),
+    )
 
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255), index=True)
     description: Mapped[Optional[str]] = mapped_column(Text)
     unit: Mapped[str] = mapped_column(String(50))
-    category_id: Mapped[int] = mapped_column(ForeignKey("commodity_category.id", ondelete="RESTRICT"), index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("commodity_category.id", ondelete="RESTRICT"))
 
     category: Mapped["CommodityCategory"] = relationship(back_populates="commodities")
     prices: Mapped[List["CommodityPrice"]] = relationship(back_populates="commodity", cascade="all, delete-orphan")
     histories: Mapped[List["CommodityHistory"]] = relationship(back_populates="commodity", cascade="all, delete-orphan")
+
+    def _sorted_prices(self) -> List["CommodityPrice"]:
+        if not self.prices:
+            return []
+        return sorted(self.prices, key=lambda p: (p.date, p.id or 0), reverse=True)
+
+    @property
+    def current_price(self) -> Optional[float]:
+        sp = self._sorted_prices()
+        return sp[0].price if sp else None
+
+    @property
+    def prev_price(self) -> Optional[float]:
+        sp = self._sorted_prices()
+        if len(sp) < 2:
+            return None
+        curr = sp[0].price
+        for p in sp[1:]:
+            if p.price != curr:
+                return p.price
+        return sp[1].price
+
+    @property
+    def price_change(self) -> float:
+        curr = self.current_price
+        prev = self.prev_price
+        if curr is None or prev is None:
+            return 0.0
+        return round(curr - prev, 2)
+
+    @property
+    def change_24h(self) -> float:
+        return self.price_change
+
+    @property
+    def price_change_percent(self) -> Optional[float]:
+        curr = self.current_price
+        prev = self.prev_price
+        if curr is None or prev is None or prev <= 0:
+            return 0.0
+        return round(((curr - prev) / prev) * 100, 2)
+
+    @property
+    def location(self) -> Optional[str]:
+        sp = self._sorted_prices()
+        return sp[0].location if sp else None
 
 class CommodityPrice(Base):
     __tablename__ = "commodity_price"

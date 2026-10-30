@@ -20,6 +20,7 @@ venv/
 # Node / Next.js
 node_modules/
 .next/
+.next-dev/
 out/
 coverage/
 *.tsbuildinfo
@@ -29,6 +30,7 @@ next-env.d.ts
 uploads/
 *.log
 logs/
+*.db
 
 # Editors and operating systems
 .DS_Store

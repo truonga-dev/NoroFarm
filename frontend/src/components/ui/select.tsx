@@ -86,7 +86,7 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, SelectTriggerProps>(
           type="button"
           onClick={() => ctx.setOpen(!ctx.open)}
           className={cn(
-            "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-10 w-full items-center justify-between rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60",
             className
           )}
           {...props}
@@ -113,7 +113,7 @@ function SelectContent({ className, children }: SelectContentProps) {
   return (
     <div
       className={cn(
-        "absolute top-full mt-1 z-50 min-w-full rounded-md border bg-popover text-popover-foreground shadow-md overflow-hidden",
+        "absolute top-full z-50 mt-1.5 min-w-full overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
         className
       )}
     >
@@ -154,7 +154,7 @@ function SelectItem({ value, className, children, disabled }: SelectItemProps) {
         }
       }}
       className={cn(
-        "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+        "relative flex min-h-9 w-full cursor-default select-none items-center rounded-lg py-2 pl-8 pr-2 text-sm outline-none hover:bg-muted hover:text-foreground",
         isSelected && "bg-accent text-accent-foreground font-medium",
         disabled && "pointer-events-none opacity-50",
         className
@@ -183,7 +183,7 @@ function NativeSelect({ onValueChange, onChange, className, children, ...props }
     <select
       onChange={handleChange}
       className={cn(
-        "flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full items-center rounded-lg border border-input bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring/25 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-60",
         className
       )}
       {...props}

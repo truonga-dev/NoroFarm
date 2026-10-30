@@ -1,298 +1,655 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
-import { PageTransition } from "@/components/layout/page-transition"
-import { Section } from "@/components/layout/section"
-import { Container } from "@/components/layout/container"
-import { PageTitle } from "@/components/layout/page-title"
-import { weatherService } from "@/api/services/weather.service"
-import { useQuery } from "@tanstack/react-query"
-import { Sun, CloudRain, Cloud, Wind, Droplets, MapPin, AlertTriangle, AlertOctagon } from "lucide-react"
+import * as React from 'react'
+import { useQuery } from '@tanstack/react-query'
+import {
+  AlertTriangle,
+  Cloud,
+  CloudRain,
+  Droplets,
+  LocateFixed,
+  MapPin,
+  RefreshCw,
+  Sprout,
+  Sun,
+  Wind,
+} from 'lucide-react'
 
-const EMPTY_LOCATIONS: any[] = []
+import { weatherService } from '@/api/services/weather.service'
+import { DataState } from '@/components/data-display/data-state'
+import { Container } from '@/components/layout/container'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
+
+interface Location {
+  code: string
+  name: string
+  latitude?: number
+  longitude?: number
+}
+interface Forecast {
+  id?: number
+  forecast_date: string
+  temperature_min: number
+  temperature_max: number
+  humidity?: number
+  wind_speed?: number
+  precipitation?: number
+  condition?: string
+}
+interface WeatherAlert {
+  id: number
+  title: string
+  description: string
+  start_time: string
+  end_time: string
+  severity?: string
+}
+
+const CROPS = [
+  { id: 'coffee', label: 'Cà phê' },
+  { id: 'pepper', label: 'Hồ tiêu' },
+  { id: 'durian', label: 'Sầu riêng' },
+  { id: 'rice', label: 'Lúa gạo' },
+]
+
+const cropNames: Record<string, string> = {
+  coffee: 'cà phê',
+  pepper: 'hồ tiêu',
+  durian: 'sầu riêng',
+  rice: 'lúa',
+}
+
+function WeatherMark({
+  condition,
+  className,
+}: {
+  condition?: string
+  className?: string
+}) {
+  const value = condition?.toLowerCase() || ''
+  if (value.includes('mưa') || value.includes('rain'))
+    return <CloudRain className={className} />
+  if (value.includes('mây') || value.includes('cloud'))
+    return <Cloud className={className} />
+  return <Sun className={className} />
+}
+
+function adviceForWeather(
+  crop: string,
+  temperature: number,
+  humidity: number,
+  wind: number,
+  rain: number
+) {
+  const cropName = cropNames[crop] || 'cây trồng'
+  return [
+    rain > 3 || humidity > 82
+      ? {
+          level: 'Cảnh báo',
+          tone: 'danger',
+          category: 'Phơi và bảo quản',
+          title: 'Không nên phơi nông sản ngoài trời',
+          description: `Độ ẩm ${Math.round(humidity)}% và lượng mưa ${rain} mm làm tăng nguy cơ ẩm mốc. Ưu tiên mái che hoặc thiết bị sấy.`,
+        }
+      : humidity > 72 || rain > 0.5
+        ? {
+            level: 'Lưu ý',
+            tone: 'warning',
+            category: 'Phơi và bảo quản',
+            title: 'Phơi mỏng, chuẩn bị bạt che',
+            description:
+              'Đảo nông sản định kỳ và thu gom sớm nếu xuất hiện mây đối lưu vào buổi chiều.',
+          }
+        : {
+            level: 'Thuận lợi',
+            tone: 'good',
+            category: 'Phơi và bảo quản',
+            title: 'Điều kiện phù hợp để phơi',
+            description: `Nhiệt độ ${temperature}°C và độ ẩm ${Math.round(humidity)}% phù hợp để hong phơi, cần kiểm tra độ ẩm thành phẩm.`,
+          },
+    wind > 5.5 || rain > 2
+      ? {
+          level: 'Tạm hoãn',
+          tone: 'danger',
+          category: 'Phun và bón',
+          title: 'Hoãn phun thuốc và bón phân',
+          description: `Gió ${wind} m/s hoặc mưa có thể làm phát tán thuốc và rửa trôi phân bón.`,
+        }
+      : {
+          level: 'Có thể thực hiện',
+          tone: 'good',
+          category: 'Phun và bón',
+          title: 'Ưu tiên sáng sớm hoặc chiều mát',
+          description:
+            'Gió nhẹ và lượng mưa thấp. Tránh phun vào giờ nắng gắt để giảm thất thoát.',
+        },
+    humidity >= 80 && temperature >= 24
+      ? {
+          level: 'Nguy cơ cao',
+          tone: 'warning',
+          category: 'Sâu bệnh',
+          title: `Theo dõi bệnh nấm trên ${cropName}`,
+          description:
+            'Nhiệt độ và ẩm độ hiện tại thuận lợi cho nấm bệnh. Kiểm tra thoát nước và tỉa cành thông thoáng.',
+        }
+      : {
+          level: 'Nguy cơ thấp',
+          tone: 'good',
+          category: 'Sâu bệnh',
+          title: 'Duy trì thăm vườn định kỳ',
+          description:
+            'Chưa ghi nhận điều kiện thời tiết bất lợi rõ rệt. Tiếp tục kiểm tra cây trồng mỗi 3–5 ngày.',
+        },
+    rain >= 5
+      ? {
+          level: 'Tạm ngưng tưới',
+          tone: 'neutral',
+          category: 'Nước tưới',
+          title: 'Kiểm tra thoát úng',
+          description: `Lượng mưa ${rain} mm đã bổ sung ẩm cho tầng đất mặt. Khơi thông rãnh để bảo vệ bộ rễ.`,
+        }
+      : temperature >= 31 && humidity < 65
+        ? {
+            level: 'Cần bổ sung',
+            tone: 'warning',
+            category: 'Nước tưới',
+            title: 'Tăng cường giữ ẩm gốc',
+            description:
+              'Nhiệt độ cao làm bốc hơi nhanh. Tưới vào sáng sớm và duy trì lớp phủ thực vật.',
+          }
+        : {
+            level: 'Ổn định',
+            tone: 'good',
+            category: 'Nước tưới',
+            title: 'Duy trì lịch tưới hiện tại',
+            description:
+              'Điều kiện nhiệt ẩm tương đối cân bằng, chưa cần điều chỉnh lớn lượng nước tưới.',
+          },
+  ]
+}
 
 export default function WeatherPage() {
-  const [selectedCode, setSelectedCode] = useState<string>("");
+  const [selectedCode, setSelectedCode] = React.useState('')
+  const [selectedCrop, setSelectedCrop] = React.useState('coffee')
+  const [gpsCoords, setGpsCoords] = React.useState<{
+    latitude: number
+    longitude: number
+  } | null>(null)
+  const [gpsStatus, setGpsStatus] = React.useState<
+    'idle' | 'loading' | 'active' | 'denied' | 'unavailable'
+  >('idle')
 
-  // 1. Lấy danh sách các vị trí đang hoạt động từ DB
-  const { data: locationsRes, isLoading: isLocLoading, isError: isLocError } = useQuery({
-    queryKey: ['weatherLocations'],
-    queryFn: () => weatherService.getLocations()
-  });
+  const locationsQuery = useQuery({
+    queryKey: ['weather-locations'],
+    queryFn: () => weatherService.getLocations(),
+  })
+  const locations: Location[] = React.useMemo(
+    () =>
+      Array.isArray(locationsQuery.data)
+        ? locationsQuery.data
+        : locationsQuery.data?.data || [],
+    [locationsQuery.data]
+  )
 
-  const locations = locationsRes?.data || EMPTY_LOCATIONS;
+  React.useEffect(() => {
+    if (!selectedCode && locations.length) setSelectedCode(locations[0].code)
+  }, [locations, selectedCode])
 
-  // Tự động chọn vị trí đầu tiên khi tải xong danh sách
-  useEffect(() => {
-    if (locations.length > 0 && !selectedCode) {
-      setSelectedCode(locations[0].code);
-    }
-  }, [locations, selectedCode]);
+  const selectedLocation = locations.find(
+    (location) => location.code === selectedCode
+  )
+  const activeCoordinates =
+    gpsCoords ||
+    (selectedLocation?.latitude !== undefined &&
+    selectedLocation?.longitude !== undefined
+      ? {
+          latitude: selectedLocation.latitude,
+          longitude: selectedLocation.longitude,
+        }
+      : null)
 
-  const selectedLocation = locations.find((l: any) => l.code === selectedCode);
-
-  // 2. Lấy thời tiết thời gian thực cho vị trí đang chọn (sử dụng GPS)
-  const { data: currentWeatherRes, isLoading: isCurrentLoading, isError: isCurrentError } = useQuery({
-    queryKey: ['currentWeather', selectedCode],
-    queryFn: () => weatherService.getCurrentWeather(undefined, selectedLocation?.latitude, selectedLocation?.longitude),
-    enabled: !!selectedLocation && selectedLocation.latitude !== undefined && selectedLocation.longitude !== undefined
-  });
-
-  const currentWeather = currentWeatherRes?.data;
-
-  // 3. Lấy dữ liệu dự báo 5 ngày cho vị trí đang chọn
-  const { data: forecastRes, isLoading: isForecastLoading, isError: isForecastError } = useQuery({
-    queryKey: ['weatherForecast', selectedCode],
+  const currentQuery = useQuery({
+    queryKey: [
+      'current-weather',
+      selectedCode,
+      gpsCoords?.latitude,
+      gpsCoords?.longitude,
+    ],
+    queryFn: () =>
+      weatherService.getCurrentWeather(
+        undefined,
+        activeCoordinates!.latitude,
+        activeCoordinates!.longitude
+      ),
+    enabled: Boolean(activeCoordinates),
+  })
+  const forecastQuery = useQuery({
+    queryKey: ['weather-forecast', selectedCode],
     queryFn: () => weatherService.getForecast(selectedCode),
-    enabled: !!selectedCode
-  });
-
-  const forecasts = forecastRes?.data || [];
-
-  // 4. Lấy danh sách cảnh báo thời tiết xấu của khu vực đó
-  const { data: alertsRes } = useQuery({
-    queryKey: ['weatherAlerts', selectedCode],
+    enabled: Boolean(selectedCode) && !gpsCoords,
+  })
+  const alertsQuery = useQuery({
+    queryKey: ['weather-alerts', selectedCode],
     queryFn: () => weatherService.getAlerts(selectedCode),
-    enabled: !!selectedCode
-  });
+    enabled: Boolean(selectedCode) && !gpsCoords,
+  })
 
-  const alerts = alertsRes?.data || [];
-
-  const isLoading = isLocLoading || (!!selectedCode && (isCurrentLoading || isForecastLoading));
-  const isError = isLocError || (isCurrentError && isForecastError);
-  const firstForecast = forecasts[0];
-  const hasCurrentTemperature = typeof currentWeather?.temperature === "number" && Number.isFinite(currentWeather.temperature);
-  const hasForecastTemperature = typeof firstForecast?.temperature_min === "number" && typeof firstForecast?.temperature_max === "number";
+  const current = currentQuery.data?.data || currentQuery.data
+  const forecasts: Forecast[] = Array.isArray(forecastQuery.data)
+    ? forecastQuery.data
+    : forecastQuery.data?.data || []
+  const alerts: WeatherAlert[] = Array.isArray(alertsQuery.data)
+    ? alertsQuery.data
+    : alertsQuery.data?.data || []
+  const firstForecast = forecasts[0]
+  const currentTemperature = Number(current?.temperature)
+  const hasCurrentTemperature = Number.isFinite(currentTemperature)
+  const hasForecastTemperature =
+    Number.isFinite(firstForecast?.temperature_min) &&
+    Number.isFinite(firstForecast?.temperature_max)
   const temperature = hasCurrentTemperature
-    ? Math.round(currentWeather.temperature)
+    ? Math.round(currentTemperature)
     : hasForecastTemperature
-      ? Math.round((firstForecast.temperature_min + firstForecast.temperature_max) / 2)
-      : null;
-  const temperatureLabel = hasCurrentTemperature ? "Thời tiết hiện tại" : hasForecastTemperature ? "Ước tính theo dự báo" : "Chưa có dữ liệu thời tiết";
+      ? Math.round(
+          (firstForecast.temperature_min + firstForecast.temperature_max) / 2
+        )
+      : null
+  const humidity = Number(current?.humidity ?? firstForecast?.humidity ?? 70)
+  const wind = Number(current?.wind_speed ?? firstForecast?.wind_speed ?? 0)
+  const rain = Number(firstForecast?.precipitation ?? 0)
+  const advice = adviceForWeather(
+    selectedCrop,
+    temperature ?? 27,
+    humidity,
+    wind,
+    rain
+  )
+  const locationLabel = gpsCoords
+    ? 'Vị trí hiện tại'
+    : selectedLocation?.name || 'Chưa chọn khu vực'
+  const isWeatherLoading =
+    currentQuery.isLoading || (!gpsCoords && forecastQuery.isLoading)
+  const isWeatherError =
+    currentQuery.isError && (gpsCoords || forecastQuery.isError)
 
-  if (isLoading) {
-    return (
-      <PageTransition>
-        <Section>
-          <Container>
-            <PageTitle 
-              title="Thời tiết Nông vụ" 
-              description="Thông tin thời tiết chuyên sâu phục vụ canh tác nông nghiệp tại các vùng trồng."
-            />
-            <div className="w-full h-14 bg-muted/40 rounded-2xl animate-pulse mt-8 mb-8" />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-8">
-                <div className="h-[280px] bg-muted/40 rounded-3xl animate-pulse" />
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-28 bg-muted/40 rounded-2xl animate-pulse" />
-                  ))}
-                </div>
-              </div>
-              <div className="h-[450px] bg-muted/40 rounded-2xl animate-pulse" />
-            </div>
-          </Container>
-        </Section>
-      </PageTransition>
-    );
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus('unavailable')
+      return
+    }
+    setGpsStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        })
+        setGpsStatus('active')
+      },
+      (error) => {
+        setGpsStatus(
+          error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable'
+        )
+        setGpsCoords(null)
+      },
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 10 * 60 * 1000 }
+    )
   }
 
-  if (isError) {
-    return (
-      <PageTransition>
-        <Section>
-          <Container>
-            <PageTitle 
-              title="Thời tiết Nông vụ" 
-              description="Thông tin thời tiết chuyên sâu phục vụ canh tác nông nghiệp tại các vùng trồng."
-            />
-            <div className="flex flex-col items-center justify-center text-center p-12 min-h-[400px] border border-dashed rounded-3xl mt-8">
-              <div className="bg-red-500/10 p-4 rounded-full text-red-500 mb-4">
-                <AlertOctagon className="w-12 h-12" />
-              </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Đã xảy ra lỗi tải dữ liệu</h3>
-              <p className="text-muted-foreground max-w-md">
-                Không thể kết nối đến máy chủ thời tiết hoặc chưa có dữ liệu đồng bộ cho khu vực này.
-                Vui lòng thử lại sau.
-              </p>
-            </div>
-          </Container>
-        </Section>
-      </PageTransition>
-    );
+  const selectManualLocation = (code: string) => {
+    setSelectedCode(code)
+    setGpsCoords(null)
+    setGpsStatus('idle')
   }
 
   return (
-    <PageTransition>
-      <Section>
-        <Container>
-          <PageTitle 
-            title="Thời tiết Nông vụ" 
-            description="Thông tin thời tiết chuyên sâu phục vụ canh tác nông nghiệp tại các vùng trồng."
-          />
-          
-          {/* Tabs lựa chọn vùng nông nghiệp */}
-          {locations.length > 0 && (
-            <div className="flex flex-wrap gap-2.5 p-2 rounded-2xl bg-muted/30 border border-muted-foreground/10 mt-8 mb-8 max-w-fit">
-              {locations.map((loc: any) => (
-                <button
-                  key={loc.code}
-                  onClick={() => setSelectedCode(loc.code)}
-                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${
-                    selectedCode === loc.code
-                      ? "bg-primary text-white shadow-lg shadow-primary/25 scale-[1.02]"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  {loc.name}
-                </button>
+    <main className="pb-16 md:pb-20">
+      <div className="border-border bg-card border-b">
+        <Container className="py-7 md:py-10">
+          <p className="text-primary text-sm font-semibold">
+            Thông tin canh tác
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] md:text-5xl">
+            Thời tiết nông vụ
+          </h1>
+          <p className="text-muted-foreground mt-3 max-w-2xl leading-7">
+            Dự báo và khuyến nghị thực hành cho các vùng sản xuất nông nghiệp.
+          </p>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label htmlFor="weather-location" className="sr-only">
+              Chọn tỉnh hoặc vùng
+            </label>
+            <select
+              id="weather-location"
+              value={gpsCoords ? '' : selectedCode}
+              onChange={(event) => selectManualLocation(event.target.value)}
+              className="border-input bg-background focus-visible:ring-ring h-10 min-w-60 rounded-lg border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
+              disabled={locationsQuery.isLoading}
+            >
+              {gpsCoords && <option value="">Vị trí hiện tại</option>}
+              {locations.map((location) => (
+                <option key={location.code} value={location.code}>
+                  {location.name}
+                </option>
               ))}
+            </select>
+            <Button
+              variant="outline"
+              onClick={useMyLocation}
+              disabled={gpsStatus === 'loading'}
+            >
+              {gpsStatus === 'loading' ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : (
+                <LocateFixed className="h-4 w-4" />
+              )}
+              {gpsStatus === 'loading'
+                ? 'Đang xác định...'
+                : 'Dùng vị trí của tôi'}
+            </Button>
+            <span className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+              <MapPin className="h-3.5 w-3.5" />
+              {locationLabel}
+            </span>
+          </div>
+
+          {(gpsStatus === 'denied' || gpsStatus === 'unavailable') && (
+            <div className="border-border bg-muted/50 mt-4 flex max-w-2xl items-start gap-3 rounded-lg border px-4 py-3 text-sm">
+              <MapPin className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                <strong>
+                  {gpsStatus === 'denied'
+                    ? 'Quyền định vị chưa được cấp.'
+                    : 'Không thể xác định vị trí.'}
+                </strong>{' '}
+                Bạn vẫn có thể chọn tỉnh hoặc vùng trong danh sách phía trên.
+              </p>
             </div>
           )}
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
-              
-              {/* Cảnh báo thiên tai/Thời tiết nguy hại */}
-              {alerts.length > 0 && (
-                <div className="space-y-4">
-                  {alerts.map((alert: any) => (
-                    <div 
-                      key={alert.id} 
-                      className="flex gap-4 p-5 rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-800 dark:text-amber-300 animate-pulse"
-                    >
-                      <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0" />
-                      <div>
-                        <div className="font-bold text-base leading-tight mb-1">{alert.title}</div>
-                        <div className="text-sm text-amber-700/90 dark:text-amber-300/80 mb-2">{alert.description}</div>
-                        <div className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                          Hiệu lực từ: {new Date(alert.start_time).toLocaleDateString("vi-VN")} - {new Date(alert.end_time).toLocaleDateString("vi-VN")}
+        </Container>
+      </div>
+
+      <Container className="py-7 md:py-10">
+        {locationsQuery.isLoading ? (
+          <div className="space-y-5">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : locationsQuery.isError ? (
+          <DataState
+            title="Không thể tải danh sách khu vực"
+            description="Vui lòng kiểm tra kết nối và thử lại."
+            action={
+              <Button onClick={() => locationsQuery.refetch()}>Thử lại</Button>
+            }
+          />
+        ) : isWeatherError ? (
+          <DataState
+            title="Không thể tải dữ liệu thời tiết"
+            description="Máy chủ thời tiết chưa phản hồi cho khu vực này."
+            action={
+              <Button
+                onClick={() => {
+                  currentQuery.refetch()
+                  forecastQuery.refetch()
+                }}
+              >
+                Thử lại
+              </Button>
+            }
+          />
+        ) : isWeatherLoading ? (
+          <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div className="space-y-5">
+              <Skeleton className="h-72 w-full" />
+              <Skeleton className="h-36 w-full" />
+            </div>
+            <Skeleton className="h-96 w-full" />
+          </div>
+        ) : (
+          <div className="space-y-7">
+            {alerts.length > 0 && (
+              <section aria-label="Cảnh báo thời tiết" className="space-y-3">
+                {alerts.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3.5 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
+                  >
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <h2 className="font-semibold">{alert.title}</h2>
+                      <p className="mt-1 text-sm leading-6 opacity-90">
+                        {alert.description}
+                      </p>
+                      <p className="mt-1.5 text-xs font-medium">
+                        Hiệu lực{' '}
+                        {new Date(alert.start_time).toLocaleDateString('vi-VN')}{' '}
+                        – {new Date(alert.end_time).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </section>
+            )}
+
+            <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="space-y-7">
+                <section className="border-border bg-card rounded-xl border">
+                  <div className="grid gap-6 px-5 py-6 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:items-center md:px-7 md:py-8">
+                    <div>
+                      <p className="text-muted-foreground inline-flex items-center gap-1.5 text-sm font-medium">
+                        <MapPin className="h-4 w-4" />
+                        {locationLabel}
+                      </p>
+                      <div className="mt-5 flex items-end gap-4">
+                        <span className="text-6xl font-bold tracking-[-0.06em] tabular-nums md:text-7xl">
+                          {temperature !== null ? `${temperature}°` : '—'}
+                        </span>
+                        <div className="pb-1">
+                          <p className="text-xl font-semibold">
+                            {current?.condition ||
+                              firstForecast?.condition ||
+                              'Chưa có mô tả'}
+                          </p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            {hasCurrentTemperature
+                              ? 'Thời tiết hiện tại'
+                              : 'Ước tính từ dự báo'}
+                          </p>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Thẻ thời tiết hiện tại */}
-              <div className="rounded-3xl bg-gradient-to-br from-primary to-emerald-800 p-8 text-white relative overflow-hidden shadow-xl shadow-primary/20 border border-emerald-500/10">
-                <div className="absolute top-0 right-0 opacity-20 pointer-events-none p-4">
-                  {currentWeather?.icon_url ? (
-                    <img 
-                      src={currentWeather.icon_url} 
-                      alt="" 
-                      className="w-48 h-48 filter brightness-125 select-none"
-                    />
-                  ) : (
-                    <Cloud className="w-48 h-48" />
-                  )}
-                </div>
-                
-                <div className="relative z-10 flex flex-col justify-between h-full min-h-[200px]">
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3.5 py-1.5 rounded-full w-fit">
-                    <MapPin className="h-4 w-4 text-emerald-300" />
-                    <span className="font-semibold text-sm tracking-wide">{selectedLocation?.name}</span>
-                  </div>
-                  
-                  <div className="flex items-end gap-6 mt-8">
-                    <div className="text-7xl sm:text-8xl font-black tracking-tighter leading-none">
-                      {temperature != null ? `${temperature}°` : "—"}
-                    </div>
-                    <div className="mb-3">
-                      <div className="text-2xl font-bold tracking-tight">{currentWeather?.condition || firstForecast?.condition || "Chưa có dữ liệu"}</div>
-                      <div className="text-white/80 text-sm mt-0.5 font-medium">{temperatureLabel}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Thẻ thông số chi tiết */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="rounded-2xl border bg-card p-5 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md transition-shadow">
-                  <Droplets className="h-7 w-7 text-blue-500" />
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Độ ẩm</div>
-                  <div className="text-xl font-bold text-foreground">
-                    {(currentWeather?.humidity ?? firstForecast?.humidity) != null ? `${Math.round(currentWeather?.humidity ?? firstForecast.humidity)}%` : "—"}
-                  </div>
-                </div>
-                
-                <div className="rounded-2xl border bg-card p-5 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md transition-shadow">
-                  <Wind className="h-7 w-7 text-teal-500" />
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sức gió</div>
-                  <div className="text-xl font-bold text-foreground">
-                    {(currentWeather?.wind_speed ?? firstForecast?.wind_speed) != null ? `${currentWeather?.wind_speed ?? firstForecast.wind_speed} m/s` : "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border bg-card p-5 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md transition-shadow">
-                  <CloudRain className="h-7 w-7 text-sky-500" />
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lượng mưa</div>
-                  <div className="text-xl font-bold text-foreground">
-                    {firstForecast?.precipitation != null ? `${firstForecast.precipitation} mm` : "—"}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border bg-card p-5 flex flex-col items-center justify-center text-center gap-2 hover:shadow-md transition-shadow">
-                  <Sun className="h-7 w-7 text-amber-500" />
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nhiệt độ ngày</div>
-                  <div className="text-sm font-bold text-foreground">
-                    {hasForecastTemperature ? `${Math.round(firstForecast.temperature_min)}° - ${Math.round(firstForecast.temperature_max)}°` : "—"}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Cột hiển thị Dự báo 5 ngày tiếp theo */}
-            <div className="rounded-3xl border bg-card p-6 shadow-sm">
-              <h3 className="font-bold text-lg mb-6 border-b pb-3 text-foreground flex items-center justify-between">
-                <span>Dự báo 5 ngày tới</span>
-                <span className="text-xs text-muted-foreground font-normal">{forecasts.length > 0 ? "Theo dữ liệu dự báo" : "Chưa có dữ liệu"}</span>
-              </h3>
-              
-              <div className="space-y-4">
-                {forecasts.length === 0 && <p className="py-12 text-center text-sm text-muted-foreground">Chưa có dự báo cho khu vực này. Vui lòng thử lại sau.</p>}
-                {forecasts.map((day: any, i: number) => {
-                  const dateObj = new Date(day.forecast_date);
-                  const dateStr = dateObj.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "numeric" });
-                  
-                  return (
-                    <div 
-                      key={day.id || i} 
-                      className="flex items-center justify-between p-3.5 rounded-xl hover:bg-muted/50 transition-all border border-transparent hover:border-muted-foreground/10"
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-sm capitalize text-foreground">{dateStr}</span>
-                        <span className="text-xs text-muted-foreground">{day.condition}</span>
+                    <div className="border-border grid grid-cols-2 border-t pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-6">
+                      <div className="border-border border-r border-b p-3">
+                        <Droplets className="h-4 w-4 text-sky-700 dark:text-sky-400" />
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          Độ ẩm
+                        </p>
+                        <p className="mt-0.5 font-semibold">
+                          {Number.isFinite(humidity)
+                            ? `${Math.round(humidity)}%`
+                            : '—'}
+                        </p>
                       </div>
-                      
-                      {day.icon_url ? (
-                        <img 
-                          src={day.icon_url} 
-                          alt={day.condition} 
-                          className="w-12 h-12 select-none"
-                        />
-                      ) : (
-                        <Cloud className="h-6 w-6 text-muted-foreground/50" />
-                      )}
-                      
-                      <div className="flex flex-col items-end gap-0.5">
-                        <span className="font-bold text-sm text-foreground">
-                          {Math.round(day.temperature_min)}° - {Math.round(day.temperature_max)}°C
-                        </span>
-                        {day.precipitation > 0 && (
-                          <span className="text-[10px] text-blue-500 font-bold bg-blue-500/5 px-1.5 py-0.5 rounded">
-                            Mưa: {day.precipitation}mm
+                      <div className="border-border border-b p-3">
+                        <Wind className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          Sức gió
+                        </p>
+                        <p className="mt-0.5 font-semibold">
+                          {Number.isFinite(wind) ? `${wind} m/s` : '—'}
+                        </p>
+                      </div>
+                      <div className="border-border border-r p-3">
+                        <CloudRain className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          Lượng mưa
+                        </p>
+                        <p className="mt-0.5 font-semibold">
+                          {Number.isFinite(rain) ? `${rain} mm` : '—'}
+                        </p>
+                      </div>
+                      <div className="p-3">
+                        <Sun className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                        <p className="text-muted-foreground mt-2 text-xs">
+                          Trong ngày
+                        </p>
+                        <p className="mt-0.5 font-semibold">
+                          {hasForecastTemperature
+                            ? `${Math.round(firstForecast.temperature_min)}°–${Math.round(firstForecast.temperature_max)}°`
+                            : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="border-border bg-card rounded-xl border">
+                  <div className="border-border flex flex-col justify-between gap-4 border-b px-5 py-4 sm:flex-row sm:items-center md:px-6">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sprout className="text-primary h-4 w-4" />
+                        <h2 className="font-semibold">Khuyến nghị canh tác</h2>
+                      </div>
+                      <p className="text-muted-foreground mt-1 text-sm">
+                        Theo điều kiện tại {locationLabel}
+                      </p>
+                    </div>
+                    <div className="bg-muted flex max-w-full gap-1 overflow-x-auto rounded-lg p-1">
+                      {CROPS.map((crop) => (
+                        <button
+                          key={crop.id}
+                          onClick={() => setSelectedCrop(crop.id)}
+                          className={cn(
+                            'shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold',
+                            selectedCrop === crop.id
+                              ? 'bg-background text-foreground shadow-sm'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {crop.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="divide-border divide-y">
+                    {advice.map((item) => (
+                      <article
+                        key={item.category}
+                        className="grid gap-2 px-5 py-4 sm:grid-cols-[150px_minmax(0,1fr)] md:px-6"
+                      >
+                        <div>
+                          <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                            {item.category}
+                          </p>
+                          <span
+                            className={cn(
+                              'mt-2 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                              item.tone === 'danger' &&
+                                'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300',
+                              item.tone === 'warning' &&
+                                'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300',
+                              item.tone === 'good' &&
+                                'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300',
+                              item.tone === 'neutral' &&
+                                'border-border bg-muted text-foreground'
+                            )}
+                          >
+                            {item.level}
                           </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-semibold">
+                            {item.title}
+                          </h3>
+                          <p className="text-muted-foreground mt-1 text-sm leading-6">
+                            {item.description}
+                          </p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
               </div>
+
+              <aside className="border-border bg-card h-fit rounded-xl border">
+                <div className="border-border border-b px-5 py-4">
+                  <h2 className="font-semibold">Dự báo những ngày tới</h2>
+                  <p className="text-muted-foreground mt-0.5 text-sm">
+                    {gpsCoords
+                      ? 'Chọn tỉnh để xem dự báo dài ngày'
+                      : `${forecasts.length} ngày dự báo`}
+                  </p>
+                </div>
+                {gpsCoords ? (
+                  <div className="px-5 py-8 text-center">
+                    <MapPin className="text-muted-foreground mx-auto h-5 w-5" />
+                    <p className="text-muted-foreground mt-2 text-sm leading-6">
+                      Dự báo dài ngày hiện được cung cấp theo khu vực đã lưu.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() =>
+                        locations[0] && selectManualLocation(locations[0].code)
+                      }
+                    >
+                      Chọn khu vực
+                    </Button>
+                  </div>
+                ) : forecasts.length ? (
+                  <div className="divide-border divide-y">
+                    {forecasts.map((day, index) => (
+                      <div
+                        key={day.id || `${day.forecast_date}-${index}`}
+                        className="flex items-center gap-3 px-5 py-4"
+                      >
+                        <WeatherMark
+                          condition={day.condition}
+                          className="text-muted-foreground h-5 w-5 shrink-0"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium capitalize">
+                            {new Date(day.forecast_date).toLocaleDateString(
+                              'vi-VN',
+                              {
+                                weekday: 'long',
+                                day: '2-digit',
+                                month: '2-digit',
+                              }
+                            )}
+                          </p>
+                          <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                            {day.condition || 'Chưa có mô tả'}
+                            {day.precipitation
+                              ? ` · Mưa ${day.precipitation} mm`
+                              : ''}
+                          </p>
+                        </div>
+                        <p className="shrink-0 text-sm font-semibold tabular-nums">
+                          {Math.round(day.temperature_min)}° /{' '}
+                          {Math.round(day.temperature_max)}°
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-5 py-10 text-center">
+                    <Cloud className="text-muted-foreground mx-auto h-5 w-5" />
+                    <p className="text-muted-foreground mt-2 text-sm">
+                      Chưa có dữ liệu dự báo.
+                    </p>
+                  </div>
+                )}
+              </aside>
             </div>
           </div>
-        </Container>
-      </Section>
-    </PageTransition>
+        )}
+      </Container>
+    </main>
   )
 }

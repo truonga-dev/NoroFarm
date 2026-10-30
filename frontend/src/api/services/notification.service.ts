@@ -26,6 +26,14 @@ export const notificationService = {
     return apiClient.delete(`/notifications/alerts/${id}`)
   },
 
+  togglePriceAlert: async (id: number) => {
+    return apiClient.patch(`/notifications/alerts/${id}/toggle`)
+  },
+
+  evaluatePriceAlerts: async () => {
+    return apiClient.post("/notifications/alerts/evaluate")
+  },
+
   subscribePush: async (sub: any) => {
     return apiClient.post("/notifications/push/subscribe", sub)
   },

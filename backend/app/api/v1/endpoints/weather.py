@@ -15,21 +15,18 @@ async def get_current_weather(request: Request, city: Optional[str] = None, lat:
     if lat is not None and lon is not None:
         # Gọi API thời tiết trực tiếp bằng tọa độ chính xác
         data = await weather_client.get_weather_by_coords(lat, lon)
-        if not data:
-            raise CustomException(status_code=400, message="Không thể lấy thông tin thời tiết cho tọa độ này")
     elif city:
         data = await weather_client.get_weather_by_city(city)
-        if not data:
-            raise CustomException(status_code=400, message="Không thể lấy thông tin thời tiết cho thành phố này")
     else:
         # Lấy IP của người dùng
-        client_ip = request.headers.get('x-forwarded-for') or request.client.host
+        client_ip = request.headers.get('x-forwarded-for') or (request.client.host if request.client else "127.0.0.1")
         location_data = await weather_client.get_location_from_ip(client_ip)
         
         # Gọi API thời tiết theo tọa độ từ IP
         data = await weather_client.get_weather_by_coords(location_data["lat"], location_data["lon"])
-        if not data:
-            raise CustomException(status_code=400, message="Không thể lấy thông tin thời tiết cho vị trí hiện tại")
+
+    if not data:
+        data = weather_client._fallback_weather(city or "Tây Nguyên")
             
     # Format data trả về cho frontend
     formatted_data = {

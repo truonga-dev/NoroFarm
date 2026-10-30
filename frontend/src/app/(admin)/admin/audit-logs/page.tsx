@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { apiClient } from "@/api/client"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 // Map action -> label & color
 const ACTION_MAP: Record<string, { label: string; color: string }> = {
@@ -61,20 +62,7 @@ export default function AdminAuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-primary" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">Lịch sử Hành động</h1>
-          </div>
-          <p className="text-muted-foreground mt-1 text-sm ml-11">
-            Theo dõi mọi thay đổi trong hệ thống - ai đã làm gì và vào lúc nào.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <AdminPageHeader eyebrow="An toàn hệ thống" title="Nhật ký hoạt động" description="Theo dõi các thay đổi quan trọng, người thực hiện và thời điểm phát sinh." actions={<>
           <span className="text-sm text-muted-foreground">
             Tổng: <span className="font-semibold text-foreground">{total}</span> bản ghi
           </span>
@@ -88,16 +76,15 @@ export default function AdminAuditLogsPage() {
             <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             Làm mới
           </Button>
-        </div>
-      </div>
+        </>} />
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3 bg-background border rounded-xl p-4 shadow-sm">
+      <AdminToolbar>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Tìm kiếm theo hành động (ví dụ: ban_user, update_setting)..."
-            className="pl-9 bg-muted/50 border-transparent focus-visible:bg-background"
+            className="pl-9"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -120,10 +107,10 @@ export default function AdminAuditLogsPage() {
             <option value="commodity">Nông sản</option>
           </select>
         </div>
-      </div>
+      </AdminToolbar>
 
       {/* Table */}
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -147,15 +134,7 @@ export default function AdminAuditLogsPage() {
                 ))
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center">
-                        <Shield className="h-7 w-7 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground font-medium">Chưa có lịch sử hành động nào</p>
-                      <p className="text-xs text-muted-foreground/70">Các thao tác của Admin sẽ được ghi lại tại đây</p>
-                    </div>
-                  </td>
+                  <td colSpan={6}><AdminEmptyState title="Chưa có nhật ký hoạt động" description="Các thao tác quản trị quan trọng sẽ được ghi nhận tại đây." /></td>
                 </tr>
               ) : (
                 logs.map((log: any) => {
@@ -240,7 +219,7 @@ export default function AdminAuditLogsPage() {
             </div>
           </div>
         )}
-      </div>
+      </AdminDataPanel>
     </div>
   )
 }

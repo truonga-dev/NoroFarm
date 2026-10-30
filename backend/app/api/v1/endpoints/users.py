@@ -59,18 +59,38 @@ async def change_password(
 
 
 @router.get("/me/watchlist", response_model=ResponseModel[list])
-async def get_watchlist(current_user: User = Depends(get_current_active_user)):
-    """Lấy danh sách nông sản đang theo dõi."""
-    # current_user.watchlist_commodities is loaded via selectin
-    commodities = current_user.watchlist_commodities
-    # We can serialize them directly or use a specific schema. We'll return basic info for simplicity.
+async def get_watchlist(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Lấy danh sách nông sản đang theo dõi kèm giá thị trường 2026 mới nhất."""
+    from sqlalchemy.future import select
+    from sqlalchemy.orm import selectinload
+
+    watched_ids = [c.id for c in current_user.watchlist_commodities]
+    if not watched_ids:
+        return success_response(data=[], message="Lấy danh sách theo dõi thành công")
+
+    stmt = (
+        select(Commodity)
+        .options(selectinload(Commodity.prices), selectinload(Commodity.category))
+        .where(Commodity.id.in_(watched_ids))
+    )
+    result = await db.execute(stmt)
+    commodities = result.scalars().all()
+
     data = [
         {
             "id": c.id,
             "code": c.code,
             "name": c.name,
             "unit": c.unit,
-            "category_id": c.category_id
+            "category_id": c.category_id,
+            "category_name": c.category.name if c.category else None,
+            "current_price": c.current_price,
+            "previous_price": c.previous_price,
+            "price_change": c.price_change,
+            "price_change_percent": c.price_change_percent,
         }
         for c in commodities
     ]

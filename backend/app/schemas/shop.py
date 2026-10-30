@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.models.shop import OrderStatus, PaymentMethod, PaymentStatus
@@ -15,10 +15,9 @@ class ProductCategoryUpdate(ProductCategoryBase):
     name: Optional[str] = None
 
 class ProductCategoryResponse(ProductCategoryBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
-    
-    class Config:
-        from_attributes = True
 
 # Product Schemas
 class ProductBase(BaseModel):
@@ -45,12 +44,11 @@ class ProductUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 class ProductResponse(ProductBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     created_at: datetime
     category: Optional[ProductCategoryResponse] = None
-
-    class Config:
-        from_attributes = True
 
 class ProductListResponse(BaseModel):
     items: List[ProductResponse]
@@ -65,14 +63,13 @@ class OrderItemCreate(BaseModel):
     quantity: int
 
 class OrderItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     product_id: int
     quantity: int
     price: float
     product: Optional[ProductResponse] = None
-
-    class Config:
-        from_attributes = True
 
 # Order Schemas
 class OrderCreate(BaseModel):
@@ -83,6 +80,8 @@ class OrderCreate(BaseModel):
     notes: Optional[str] = None
 
 class OrderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     user_id: int
     total_amount: float
@@ -95,9 +94,6 @@ class OrderResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     items: List[OrderItemResponse]
-
-    class Config:
-        from_attributes = True
 
 class OrderListResponse(BaseModel):
     items: List[OrderResponse]

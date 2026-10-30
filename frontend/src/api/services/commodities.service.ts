@@ -45,6 +45,10 @@ export const commoditiesService = {
     return apiClient.get('/commodities/top-movers', { limit });
   },
 
+  getRealtimePrices: async (limit: number = 50, sync: boolean = false) => {
+    return apiClient.get('/commodities/realtime', { limit, sync });
+  },
+
   crawlLive: async () => {
     return apiClient.post('/commodities/crawl-live');
   }

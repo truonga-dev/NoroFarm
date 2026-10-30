@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
@@ -13,6 +13,8 @@ class ContactReply(BaseModel):
     reply_content: str
 
 class ContactResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     email: str
@@ -24,9 +26,6 @@ class ContactResponse(BaseModel):
     replied_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 class ContactListResponse(BaseModel):
     items: List[ContactResponse]

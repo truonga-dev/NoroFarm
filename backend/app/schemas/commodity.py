@@ -95,6 +95,12 @@ class CommodityResponse(CommodityBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    current_price: Optional[float] = None
+    prev_price: Optional[float] = None
+    price_change: Optional[float] = 0.0
+    change_24h: Optional[float] = 0.0
+    price_change_percent: Optional[float] = 0.0
+    location: Optional[str] = None
     category: Optional[CategoryResponse] = None
     prices: List[PriceResponse] = Field(default_factory=list)
 

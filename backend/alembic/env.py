@@ -79,11 +79,18 @@ async def run_async_migrations() -> None:
 
     """
 
+    engine_options = {
+        "prefix": "sqlalchemy.",
+        "poolclass": pool.NullPool,
+    }
+    # asyncpg accepts this option, while aiosqlite forwards unknown options
+    # directly to sqlite3.connect() and raises TypeError.
+    if not settings.SQLALCHEMY_DATABASE_URI.startswith("sqlite"):
+        engine_options["connect_args"] = {"statement_cache_size": 0}
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        connect_args={"statement_cache_size": 0},
+        **engine_options,
     )
 
     async with connectable.connect() as connection:

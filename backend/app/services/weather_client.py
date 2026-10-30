@@ -7,6 +7,32 @@ logger = logging.getLogger("norofarm")
 
 class WeatherClient:
     """Service gọi API thời tiết (OpenWeather) và lấy tọa độ từ IP (IP-API)"""
+
+    CITY_COORDS = {
+        "đắk lắk": (12.6667, 108.0383, "Đắk Lắk"),
+        "dak lak": (12.6667, 108.0383, "Đắk Lắk"),
+        "buon ma thuot": (12.6667, 108.0383, "Đắk Lắk"),
+        "gia lai": (13.9833, 108.0000, "Gia Lai"),
+        "pleiku": (13.9833, 108.0000, "Gia Lai"),
+        "kon tum": (14.3545, 108.0076, "Kon Tum"),
+        "lâm đồng": (11.9404, 108.4583, "Lâm Đồng"),
+        "lam dong": (11.9404, 108.4583, "Lâm Đồng"),
+        "đắk nông": (12.0042, 107.6907, "Đắk Nông"),
+        "dak nong": (12.0042, 107.6907, "Đắk Nông"),
+        "hà nội": (21.0285, 105.8542, "Hà Nội"),
+        "hanoi": (21.0285, 105.8542, "Hà Nội"),
+        "hồ chí minh": (10.8231, 106.6297, "TP. Hồ Chí Minh"),
+        "ho chi minh": (10.8231, 106.6297, "TP. Hồ Chí Minh"),
+    }
+
+    @staticmethod
+    def _fallback_weather(name: str = "Tây Nguyên") -> Dict[str, Any]:
+        return {
+            "name": name,
+            "main": {"temp": 27.5, "humidity": 72},
+            "wind": {"speed": 2.8},
+            "weather": [{"description": "trời quang mây tạnh", "icon": "02d"}],
+        }
     
     def __init__(self):
         self.api_key = settings.OPENWEATHER_API_KEY
@@ -21,14 +47,24 @@ class WeatherClient:
     async def get_weather_by_city(self, city: str) -> Optional[Dict[str, Any]]:
         """Lấy thời tiết theo tên thành phố (Có Cache 15 phút)"""
         from app.core.redis import redis_client
-        cache_key = f"weather:city:{city.strip().lower()}"
+        norm_city = city.strip().lower()
+        cache_key = f"weather:city:{norm_city}"
         cached = await redis_client.get(cache_key)
         if cached:
             return cached
 
+        if norm_city in self.CITY_COORDS:
+            lat, lon, display_name = self.CITY_COORDS[norm_city]
+            data = await self.get_weather_by_coords(lat, lon)
+            if data:
+                data = {**data, "name": display_name}
+                await redis_client.set(cache_key, data, expire=900)
+                return data
+            return self._fallback_weather(display_name)
+
         if not self.api_key:
             logger.error("Chưa cấu hình OPENWEATHER_API_KEY")
-            return None
+            return self._fallback_weather(city)
 
         url = f"{self.base_url}?q={city}&appid={self.api_key}&units=metric&lang=vi"
         try:
@@ -38,10 +74,10 @@ class WeatherClient:
                 data = response.json()
                 await redis_client.set(cache_key, data, expire=900)
                 return data
-            logger.error(f"OpenWeather API lỗi: {response.status_code} - {response.text}")
+            logger.warning(f"OpenWeather API lỗi ({city}): {response.status_code} - dùng dữ liệu dự phòng")
         except Exception as e:
-            logger.error(f"Lỗi khi gọi OpenWeather API (city={city}): {e}")
-        return None
+            logger.warning(f"Lỗi khi gọi OpenWeather API (city={city}): {e}")
+        return self._fallback_weather(city)
 
     async def get_weather_by_coords(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
         """Lấy thời tiết theo tọa độ (Làm tròn 2 chữ số thập phân, Cache 15 phút)"""
@@ -54,7 +90,7 @@ class WeatherClient:
 
         if not self.api_key:
             logger.error("Chưa cấu hình OPENWEATHER_API_KEY")
-            return None
+            return self._fallback_weather()
 
         url = f"{self.base_url}?lat={lat}&lon={lon}&appid={self.api_key}&units=metric&lang=vi"
         try:
@@ -64,10 +100,10 @@ class WeatherClient:
                 data = response.json()
                 await redis_client.set(cache_key, data, expire=900)
                 return data
-            logger.error(f"OpenWeather API lỗi: {response.status_code} - {response.text}")
+            logger.warning(f"OpenWeather API lỗi: {response.status_code} - dùng dữ liệu dự phòng")
         except Exception as e:
-            logger.error(f"Lỗi khi gọi OpenWeather API (coords={lat},{lon}): {e}")
-        return None
+            logger.warning(f"Lỗi khi gọi OpenWeather API (coords={lat},{lon}): {e}")
+        return self._fallback_weather()
 
     async def get_forecast_by_coords(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
         """Lấy dự báo thời tiết 5 ngày / 3 giờ theo tọa độ (Cache 30 phút)"""

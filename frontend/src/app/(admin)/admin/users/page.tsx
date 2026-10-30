@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/toast-context"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/api/client"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 export default function AdminUsersPage() {
   const [search, setSearch] = React.useState("")
@@ -75,29 +76,23 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quản lý Người dùng</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Xem danh sách, phân quyền và khóa các tài khoản thành viên.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <AdminPageHeader eyebrow="Tài khoản" title="Quản lý người dùng" description="Xem danh sách, phân quyền và quản lý trạng thái tài khoản thành viên." />
 
-      <div className="flex items-center gap-4 bg-background p-4 rounded-xl border shadow-sm">
+      <AdminToolbar>
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Tìm kiếm theo tên hoặc email..." 
-            className="pl-9 bg-muted/50 border-transparent focus-visible:ring-1 focus-visible:bg-background"
+            className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-      </div>
+        <p className="text-sm text-muted-foreground sm:ml-auto">{filteredUsers.length} người dùng</p>
+      </AdminToolbar>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -119,9 +114,7 @@ export default function AdminUsersPage() {
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    Không tìm thấy người dùng nào.
-                  </td>
+                  <td colSpan={6}><AdminEmptyState title="Không tìm thấy người dùng" description="Thử tìm bằng tên hoặc địa chỉ email khác." /></td>
                 </tr>
               ) : (
                 filteredUsers.map((user: any) => {
@@ -193,7 +186,7 @@ export default function AdminUsersPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
 
       <Dialog open={isBanModalOpen} onOpenChange={setIsBanModalOpen}>
         <DialogContent className="sm:max-w-[425px]">

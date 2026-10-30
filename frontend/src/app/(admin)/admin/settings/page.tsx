@@ -12,36 +12,66 @@ import { useAuthStore } from "@/store/authStore"
 import { useToast } from "@/components/ui/toast-context"
 import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
+import { profileService } from "@/api/services/profile.service"
+import { AdminPageHeader } from "@/features/admin/components/admin-page"
 
 export default function AdminSettingsPage() {
-  const { user, logout } = useAuthStore()
+  const { user, logout, updateUser } = useAuthStore()
   const { theme, setTheme } = useTheme()
   const toast = useToast()
   const router = useRouter()
 
   const [mounted, setMounted] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
+  const [fullName, setFullName] = React.useState(user?.profile?.full_name || "")
+  const [oldPassword, setOldPassword] = React.useState("")
+  const [newPassword, setNewPassword] = React.useState("")
+  const [confirmPassword, setConfirmPassword] = React.useState("")
 
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  React.useEffect(() => {
+    setFullName(user?.profile?.full_name || "")
+  }, [user?.profile?.full_name])
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    setTimeout(() => {
+    try {
+      await profileService.updateProfile({ full_name: fullName.trim() })
+      updateUser({ profile: user?.profile ? { ...user.profile, full_name: fullName.trim() } : null })
+      toast.success("Đã cập nhật thông tin tài khoản")
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Không thể cập nhật thông tin")
+    } finally {
       setIsSaving(false)
-      toast.success("Đã cập nhật thông tin thành công!")
-    }, 1000)
+    }
   }
 
-  const handleSavePassword = (e: React.FormEvent) => {
+  const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (newPassword !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận chưa khớp")
+      return
+    }
+    if (newPassword.length < 8) {
+      toast.error("Mật khẩu mới cần có ít nhất 8 ký tự")
+      return
+    }
     setIsSaving(true)
-    setTimeout(() => {
+    try {
+      await profileService.changePassword({ old_password: oldPassword, new_password: newPassword })
+      setOldPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+      toast.success("Đã thay đổi mật khẩu")
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Không thể thay đổi mật khẩu")
+    } finally {
       setIsSaving(false)
-      toast.success("Đã thay đổi mật khẩu an toàn!")
-    }, 1000)
+    }
   }
 
   const handleLogout = () => {
@@ -53,13 +83,8 @@ export default function AdminSettingsPage() {
   if (!mounted) return null
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Cài đặt Hệ thống</h2>
-        <p className="text-muted-foreground mt-2">
-          Quản lý tài khoản, bảo mật và các tùy chọn giao diện hiển thị.
-        </p>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <AdminPageHeader eyebrow="Tài khoản quản trị" title="Cài đặt hệ thống" description="Quản lý hồ sơ, bảo mật và tùy chọn hiển thị của tài khoản." />
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-12 mb-6 bg-muted/50 p-1">
@@ -75,8 +100,8 @@ export default function AdminSettingsPage() {
         </TabsList>
 
         {/* Tab Tài khoản */}
-        <TabsContent value="profile" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <Card className="border-none shadow-sm bg-background">
+        <TabsContent value="profile" className="space-y-6">
+          <Card className="border shadow-sm">
             <CardHeader>
               <CardTitle>Thông tin Cá nhân</CardTitle>
               <CardDescription>Cập nhật thông tin hiển thị của bạn trên hệ thống</CardDescription>
@@ -96,7 +121,7 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="fullname">Họ và tên</Label>
-                    <Input id="fullname" defaultValue={user?.profile?.full_name || ""} className="bg-muted/30" />
+                    <Input id="fullname" value={fullName} onChange={(event) => setFullName(event.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Địa chỉ Email</Label>
@@ -119,8 +144,8 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         {/* Tab Bảo mật */}
-        <TabsContent value="security" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <Card className="border-none shadow-sm bg-background">
+        <TabsContent value="security" className="space-y-6">
+          <Card className="border shadow-sm">
             <CardHeader>
               <CardTitle>Đổi mật khẩu</CardTitle>
               <CardDescription>Đảm bảo tài khoản của bạn đang sử dụng mật khẩu mạnh và an toàn</CardDescription>
@@ -129,15 +154,15 @@ export default function AdminSettingsPage() {
               <form onSubmit={handleSavePassword} className="space-y-4 max-w-md">
                 <div className="space-y-2">
                   <Label htmlFor="current-password">Mật khẩu hiện tại</Label>
-                  <Input id="current-password" type="password" required className="bg-muted/30" />
+                  <Input id="current-password" type="password" required autoComplete="current-password" value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="new-password">Mật khẩu mới</Label>
-                  <Input id="new-password" type="password" required className="bg-muted/30" />
+                  <Input id="new-password" type="password" required minLength={8} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirm-password">Xác nhận mật khẩu mới</Label>
-                  <Input id="confirm-password" type="password" required className="bg-muted/30" />
+                  <Input id="confirm-password" type="password" required minLength={8} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
                 </div>
                 <div className="pt-4">
                   <Button type="submit" disabled={isSaving} className="w-full sm:w-auto">
@@ -150,14 +175,14 @@ export default function AdminSettingsPage() {
         </TabsContent>
 
         {/* Tab Hệ thống */}
-        <TabsContent value="preferences" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <Card className="border-none shadow-sm bg-background">
+        <TabsContent value="preferences" className="space-y-6">
+          <Card className="border shadow-sm">
             <CardHeader>
               <CardTitle>Cài đặt Giao diện</CardTitle>
               <CardDescription>Tùy chỉnh cách hệ thống hiển thị với bạn</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/20">
+              <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 p-4">
                 <div>
                   <h4 className="font-medium">Chế độ tối (Dark Mode)</h4>
                   <p className="text-sm text-muted-foreground">Kích hoạt giao diện tối bảo vệ mắt</p>
@@ -168,7 +193,7 @@ export default function AdminSettingsPage() {
                 />
               </div>
               
-              <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/20">
+              <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 p-4">
                 <div>
                   <h4 className="font-medium">Nhận thông báo qua Email</h4>
                   <p className="text-sm text-muted-foreground">Nhận email khi có bình luận hoặc thay đổi giá</p>
@@ -176,7 +201,7 @@ export default function AdminSettingsPage() {
                 <Switch defaultChecked />
               </div>
 
-              <div className="flex items-center justify-between p-4 border rounded-xl bg-muted/20">
+              <div className="flex items-center justify-between gap-4 rounded-lg border bg-muted/20 p-4">
                 <div>
                   <h4 className="font-medium">Ngôn ngữ hiển thị</h4>
                   <p className="text-sm text-muted-foreground">Hiện tại chỉ hỗ trợ Tiếng Việt</p>

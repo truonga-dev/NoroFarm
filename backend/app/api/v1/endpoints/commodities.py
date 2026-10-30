@@ -22,11 +22,12 @@ async def get_commodities(
     sort_desc: bool = False,
     search: Optional[str] = None,
     category_id: Optional[int] = None,
+    category: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     service = CommodityService(db)
     params = PaginationParams(page=page, size=size, sort_by=sort_by, sort_desc=sort_desc)
-    result = await service.get_commodities(params, search, category_id)
+    result = await service.get_commodities(params, search, category_id, category)
     return success_response(data=result)
 
 @router.get("/top-movers", response_model=ResponseModel[List[TopMoverResponse]])
@@ -43,6 +44,23 @@ async def get_top_movers(
 async def get_commodity_overview(db: AsyncSession = Depends(get_db)):
     service = CommodityService(db)
     return success_response(data=await service.get_overview())
+
+@router.get("/realtime", response_model=ResponseModel[List[TopMoverResponse]])
+async def get_realtime_prices_2026(
+    limit: int = Query(50, ge=1, le=100),
+    sync: bool = Query(False, description="Kích hoạt đồng bộ trực tiếp trước khi trả về"),
+    db: AsyncSession = Depends(get_db)
+):
+    """API lấy bảng giá thị trường thời gian thực 2026 cho toàn bộ nông sản"""
+    if sync:
+        from app.tasks.crawlers import run_all_crawlers
+        await run_all_crawlers()
+    service = CommodityService(db)
+    movers = await service.get_top_movers(limit)
+    return success_response(
+        data=movers,
+        message="Bảng giá thị trường nông sản thời gian thực 2026"
+    )
 
 @router.get("/{commodity_id}", response_model=ResponseModel[CommodityResponse])
 async def get_commodity(commodity_id: int, db: AsyncSession = Depends(get_db)):
@@ -131,11 +149,14 @@ async def get_price_history(
 
 @router.post("/crawl-live", response_model=ResponseModel[dict])
 async def trigger_live_crawl():
-    """Kích hoạt crawler lấy giá thị trường thực tế ngay lập tức từ nguồn bên ngoài"""
+    """Kích hoạt crawler lấy giá thị trường thực tế 2026 ngay lập tức từ nguồn bên ngoài"""
     from app.tasks.crawlers import run_all_crawlers
-    import asyncio
-    asyncio.create_task(run_all_crawlers())
+    from datetime import datetime, timezone
+    await run_all_crawlers()
     return success_response(
-        data={"status": "started"},
-        message="Đã kích hoạt đồng bộ giá thị trường thực tế từ nguồn trực tiếp."
+        data={
+            "status": "completed",
+            "synced_at": datetime.now(timezone.utc).isoformat()
+        },
+        message="Đã đồng bộ thành công giá thị trường thời gian thực 2026."
     )

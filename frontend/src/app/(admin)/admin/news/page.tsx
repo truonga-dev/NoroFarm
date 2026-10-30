@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { newsService } from "@/api/services/news.service"
 import { useToast } from "@/components/ui/toast-context"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 export default function AdminNewsPage() {
   const [search, setSearch] = React.useState("")
@@ -46,21 +47,19 @@ export default function AdminNewsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Quản lý Tin tức</h1>
-          <p className="text-muted-foreground mt-1">Danh sách các bài báo, kiến thức nông nghiệp.</p>
-        </div>
-        <Link href="/admin/news/create">
+      <AdminPageHeader
+        eyebrow="Nội dung"
+        title="Quản lý tin tức"
+        description="Biên tập, xuất bản và theo dõi nội dung kiến thức nông nghiệp."
+        actions={<Link href="/admin/news/create">
           <Button className="gap-2">
             <Plus className="h-4 w-4" />
             Viết bài mới
           </Button>
-        </Link>
-      </div>
+        </Link>}
+      />
 
-      <div className="bg-card border rounded-2xl p-4 shadow-sm">
-        <div className="flex gap-4 mb-6">
+      <AdminToolbar>
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
@@ -70,9 +69,11 @@ export default function AdminNewsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-        </div>
+          <p className="text-sm text-muted-foreground sm:ml-auto">{items.length} bài viết</p>
+      </AdminToolbar>
 
-        <div className="rounded-xl border overflow-hidden">
+      <AdminDataPanel>
+        <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground">
               <tr>
@@ -96,9 +97,7 @@ export default function AdminNewsPage() {
                 ))
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                    Chưa có bài viết nào. Hãy tạo bài viết đầu tiên!
-                  </td>
+                  <td colSpan={5}><AdminEmptyState title="Chưa có bài viết" description="Tạo bài viết đầu tiên để bắt đầu xây dựng kho nội dung." /></td>
                 </tr>
               ) : (
                 items.map((item: any) => (
@@ -117,9 +116,9 @@ export default function AdminNewsPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        {item.slug && <Link href={`/news/${item.slug}`} target="_blank" aria-label={`Xem bài ${item.title}`}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"><Eye className="h-4 w-4" /></Button>
+                        </Link>}
                         <Link href={`/admin/news/${item.id}/edit`}>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-500">
                             <Edit className="h-4 w-4" />
@@ -142,7 +141,7 @@ export default function AdminNewsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
     </div>
   )
 }

@@ -16,7 +16,6 @@ import {
   Star,
   ChevronRight,
   RefreshCw,
-  Sparkles,
   ArrowUpRight,
   BarChart3,
   CloudSun,
@@ -76,16 +75,27 @@ function latestRegionalPrice(items: any[], kind: "coffee" | "pepper", location: 
   })
 
   const region = location.toLocaleLowerCase("vi")
-  const isWorldMarket = location === "Robusta London" || location === "Arabica New York"
-  const candidates = isWorldMarket
-    ? matching.filter((item) => String(item.name).toLocaleLowerCase("vi").includes(region))
-    : kind === "coffee"
-      ? matching.filter((item) => String(item.name).toLocaleLowerCase("vi").includes("robusta") || String(item.code).toLowerCase().includes("ca_phe_ro"))
-      : matching
+  // Ưu tiên tìm mặt hàng có tên vùng trực tiếp (VD: "Cà phê Đắk Lắk", "Hồ tiêu Gia Lai", "Robusta London")
+  const directMatch = matching.find((item) => String(item.name || "").toLocaleLowerCase("vi").includes(region))
+  if (directMatch) {
+    const sortedPrices = [...(directMatch.prices || [])].sort(
+      (a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    if (sortedPrices[0]) {
+      return { item: directMatch, price: sortedPrices[0] }
+    }
+    if (directMatch.current_price != null) {
+      return {
+        item: directMatch,
+        price: { price: directMatch.current_price, currency: "VND", date: directMatch.updated_at }
+      }
+    }
+  }
 
-  return candidates.map((item) => {
+  // Fallback tìm theo price.location hoặc mặt hàng đại diện
+  return matching.map((item) => {
     const prices = (item.prices || [])
-      .filter((price: any) => isWorldMarket || String(price.location || "").toLocaleLowerCase("vi").includes(region))
+      .filter((price: any) => String(price.location || "").toLocaleLowerCase("vi").includes(region))
       .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
     return { item, price: prices[0] }
   }).find((result) => result.price) || null
@@ -111,6 +121,25 @@ export default function DashboardPage() {
   const [chartDays, setChartDays] = useState<number>(14)
   const [weatherLocation, setWeatherLocation] = useState("")
   const [coords, setCoords] = useState<{ lat?: number; lon?: number }>({})
+
+  // Khôi phục vùng ưu tiên từ Cài đặt (/settings)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("displaySettings")
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed.defaultRegion === "dong-nam-bo") {
+          setCoffeeLocation("Lâm Đồng")
+          setPepperLocation("Bình Phước")
+        } else if (parsed.defaultRegion === "tay-nguyen") {
+          setCoffeeLocation("Đắk Lắk")
+          setPepperLocation("Gia Lai")
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
 
   // Geolocation
   useEffect(() => {
@@ -259,9 +288,9 @@ export default function DashboardPage() {
 
   return (
     <PageTransition>
-      <div className="flex min-h-[calc(100vh-4rem)] bg-muted/20">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-muted/20 md:flex-row">
         <Sidebar />
-        <main className="flex-1 overflow-x-hidden">
+        <main className="min-w-0 flex-1 overflow-x-hidden">
           <Section className="py-6 md:py-8 lg:py-10">
             <Container>
               {/* Header */}
@@ -797,17 +826,17 @@ export default function DashboardPage() {
                         <Bell className="h-4 w-4 text-primary" />
                         <span>Cảnh báo giá</span>
                       </Link>
-                      <Link href="/pests" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
-                        <Sparkles className="h-4 w-4 text-amber-500" />
-                        <span>Nhận diện sâu bệnh</span>
+                      <Link href="/weather" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
+                        <CloudSun className="h-4 w-4 text-amber-500" />
+                        <span>Thời tiết nông vụ</span>
                       </Link>
-                      <Link href="/market" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
+                      <Link href="/marketplace" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
                         <BarChart3 className="h-4 w-4 text-blue-500" />
-                        <span>Sàn nông sản</span>
+                        <span>Sàn giao dịch B2B</span>
                       </Link>
-                      <Link href="/forum" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
+                      <Link href="/shop" className="flex items-center gap-2 p-2.5 rounded-xl bg-muted/40 hover:bg-muted/80 transition-all border border-border/50 text-xs font-semibold">
                         <Layers className="h-4 w-4 text-emerald-500" />
-                        <span>Diễn đàn nông dân</span>
+                        <span>Cửa hàng vật tư</span>
                       </Link>
                     </div>
                   </div>

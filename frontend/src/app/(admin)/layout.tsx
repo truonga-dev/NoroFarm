@@ -6,7 +6,7 @@ import { AdminSidebar } from "@/features/admin/components/admin-sidebar"
 
 export const metadata: Metadata = {
   title: "Admin CMS | NoroFarm",
-  description: "Quản trị hệ thống NoroFarm",
+  description: "Trung tâm quản trị hệ thống NoroFarm",
 }
 
 export default function AdminLayout({
@@ -16,11 +16,11 @@ export default function AdminLayout({
 }) {
   return (
     <AdminGuard>
-      <div className="flex min-h-screen bg-muted/40">
+      <div className="min-h-screen bg-muted/30">
         <AdminSidebar />
-        <main className="flex-1 pl-64">
+        <main className="min-w-0 md:pl-60">
           <AdminHeader />
-          <div className="p-8">
+          <div className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
             {children}
           </div>
         </main>

@@ -5,6 +5,7 @@ from app.models.weather import Location, WeatherForecast, WeatherAlert
 from app.schemas.weather import WeatherForecastCreate
 from app.repositories.weather import WeatherRepository
 from app.core.cache import cache
+from app.services.weather_client import weather_client
 
 class WeatherService:
     """Service xử lý nghiệp vụ Thời tiết (Forecast, Location, Alert)"""
@@ -61,7 +62,6 @@ class WeatherService:
         from collections import defaultdict
         from datetime import datetime, timezone, timedelta
         from sqlalchemy import delete
-        from app.services.weather_client import weather_client
         from app.core.logger import logger
 
         locations = await self.repo.get_locations()

@@ -1,6 +1,6 @@
 "use client";
 // Note: Metadata không hỗ trợ trong client component. Title sẽ được set từ layout.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -113,6 +113,18 @@ export default function SettingsPage() {
     defaultRegion: "tay-nguyen",
     defaultCommodity: "coffee"
   });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("displaySettings");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setDisplaySettings((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleSaveDisplay = (e: React.FormEvent) => {
     e.preventDefault();

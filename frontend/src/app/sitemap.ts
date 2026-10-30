@@ -23,7 +23,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 2. Fetch published news articles
   let newsRoutes: MetadataRoute.Sitemap = []
   try {
-    const res = await fetch(`${API_URL}/news?size=100`, { next: { revalidate: 3600 } }).catch(() => null)
+    const res = await fetch(`${API_URL}/news?size=100`, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => null)
     if (res && res.ok) {
       const data = await res.json()
       const articles = data?.data?.items || data?.items || []
@@ -43,7 +46,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 3. Fetch active agricultural commodities
   let commodityRoutes: MetadataRoute.Sitemap = []
   try {
-    const res = await fetch(`${API_URL}/commodities?size=100`, { next: { revalidate: 3600 } }).catch(() => null)
+    const res = await fetch(`${API_URL}/commodities?size=100`, {
+      next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => null)
     if (res && res.ok) {
       const data = await res.json()
       const items = data?.data?.items || data?.items || []

@@ -1,143 +1,75 @@
 "use client"
 
 import * as React from "react"
-import { cn } from "@/lib/utils"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { 
-  LayoutDashboard, 
-  Bookmark, 
-  Settings, 
-  MessageSquare,
-  LogOut,
-  Bell,
-  Store,
-  ShoppingBag,
-  Save
-} from "lucide-react"
+import { Bell, Bookmark, Headphones, LayoutDashboard, LogOut, Settings, ShoppingBag, Store } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
+import { cn } from "@/lib/utils"
 
 const SIDEBAR_ITEMS = [
-  {
-    title: "Tổng quan",
-    href: "/dashboard",
-    icon: LayoutDashboard,
-  },
-  {
-    title: "Quản lý tin đăng",
-    href: "/dashboard/my-posts",
-    icon: Store,
-  },
-  {
-    title: "Mục đã lưu",
-    href: "/dashboard/saved",
-    icon: Save,
-  },
-  {
-    title: "Đơn mua (B2C)",
-    href: "/dashboard/orders",
-    icon: ShoppingBag,
-  },
-  {
-    title: "Cảnh báo giá",
-    href: "/dashboard/alerts",
-    icon: Bell,
-  },
-  {
-    title: "Cài đặt",
-    href: "/settings",
-    icon: Settings,
-  },
+  { title: "Tổng quan", shortTitle: "Tổng quan", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Quản lý tin đăng", shortTitle: "Tin đăng", href: "/dashboard/my-posts", icon: Store },
+  { title: "Mục đã lưu", shortTitle: "Đã lưu", href: "/dashboard/saved", icon: Bookmark },
+  { title: "Đơn mua", shortTitle: "Đơn mua", href: "/dashboard/orders", icon: ShoppingBag },
+  { title: "Cảnh báo giá", shortTitle: "Cảnh báo", href: "/dashboard/alerts", icon: Bell },
+  { title: "Cài đặt", shortTitle: "Cài đặt", href: "/settings", icon: Settings },
 ]
 
-const BOTTOM_ITEMS = [
-  {
-    title: "Hỗ trợ",
-    href: "/contact",
-    icon: MessageSquare,
-  },
-  {
-    title: "Đăng xuất",
-    href: "/login",
-    icon: LogOut,
-  },
-]
-
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+interface SidebarProps extends React.HTMLAttributes<HTMLElement> {}
 
 export function Sidebar({ className, ...props }: SidebarProps) {
   const pathname = usePathname()
   const { logout } = useAuth()
+  const isActive = (href: string) => href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`)
 
   return (
-    <aside
-      className={cn(
-        "hidden w-64 shrink-0 flex-col justify-between border-r bg-card/50 backdrop-blur-xl px-4 py-6 md:flex h-[calc(100vh-4rem)] sticky top-16",
-        className
-      )}
-      {...props}
-    >
-      <div className="flex flex-col gap-8">
-        <div>
-          <h4 className="mb-4 px-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Menu
-          </h4>
-          <nav className="grid gap-1">
-            {SIDEBAR_ITEMS.map((item, index) => {
+    <>
+      <div className="w-full border-b bg-background md:hidden">
+        <nav aria-label="Điều hướng tài khoản" className="flex gap-1 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {SIDEBAR_ITEMS.map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.href)
+            return (
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors", active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {item.shortTitle}
+              </Link>
+            )
+          })}
+        </nav>
+      </div>
+
+      <aside className={cn("sticky top-16 hidden h-[calc(100vh-4rem)] w-60 shrink-0 flex-col border-r bg-background md:flex", className)} {...props}>
+        <div className="flex-1 px-4 py-6">
+          <div className="mb-5 border-b px-2 pb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Khu vực của tôi</p>
+            <p className="mt-1 text-sm text-foreground/80">Quản lý hoạt động NoroFarm</p>
+          </div>
+          <nav aria-label="Điều hướng tài khoản" className="space-y-1">
+            {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
-              
+              const active = isActive(item.href)
               return (
-                <Link
-                  key={index}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-all hover:text-primary",
-                    isActive 
-                      ? "bg-primary/10 text-primary" 
-                      : "text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  <Icon className="h-5 w-5" />
+                <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-3 rounded-md border border-transparent px-3 py-2.5 text-sm font-medium transition-colors", active ? "border-primary/15 bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground")}>
+                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                   {item.title}
                 </Link>
               )
             })}
           </nav>
         </div>
-      </div>
-      
-      <div>
-        <nav className="grid gap-1">
-          {BOTTOM_ITEMS.map((item, index) => {
-            const Icon = item.icon
-            
-            if (item.title === "Đăng xuất") {
-              return (
-                <button
-                  key={index}
-                  onClick={logout}
-                  className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-red-500/10 hover:text-red-500"
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.title}
-                </button>
-              )
-            }
-            
-            return (
-              <Link
-                key={index}
-                href={item.href}
-                className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
-              >
-                <Icon className="h-5 w-5" />
-                {item.title}
-              </Link>
-            )
-          })}
-        </nav>
-      </div>
-    </aside>
+        <div className="border-t p-4">
+          <Link href="/contact" className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground">
+            <Headphones className="h-[18px] w-[18px]" aria-hidden="true" />
+            Trung tâm hỗ trợ
+          </Link>
+          <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
+            <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />
+            Đăng xuất
+          </button>
+        </div>
+      </aside>
+    </>
   )
 }

@@ -8,12 +8,12 @@ interface PageTitleProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function PageTitle({ title, description, className, ...props }: PageTitleProps) {
   return (
-    <div className={cn("space-y-2 pb-8 pt-6 md:pb-12 md:pt-10", className)} {...props}>
-      <h1 className="text-3xl font-bold tracking-tight md:text-4xl lg:text-5xl">
+    <div className={cn("max-w-3xl space-y-2.5 pb-8 pt-5 md:pb-10 md:pt-8", className)} {...props}>
+      <h1 className="text-[2rem] font-bold leading-[1.15] tracking-[-0.03em] md:text-[2.5rem] lg:text-5xl">
         {title}
       </h1>
       {description && (
-        <p className="text-lg text-muted-foreground">{description}</p>
+        <p className="max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">{description}</p>
       )}
     </div>
   )

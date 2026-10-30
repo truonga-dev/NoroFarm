@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @keyframes navigation-progress {
   from { transform: translateX(-100%); }
@@ -51,65 +52,65 @@
 
 @layer base {
   :root {
-    --background: #FFFFFF;
-    --foreground: #0F172A;
+    --background: #FAFBF7;
+    --foreground: #18221B;
     
     --card: #FFFFFF;
-    --card-foreground: #0F172A;
+    --card-foreground: #18221B;
     
     --popover: #FFFFFF;
-    --popover-foreground: #0F172A;
+    --popover-foreground: #18221B;
     
-    --primary: #10B981;
+    --primary: #25633E;
     --primary-foreground: #FFFFFF;
     
-    --secondary: #F1F5F9;
-    --secondary-foreground: #0F172A;
+    --secondary: #F2F5EE;
+    --secondary-foreground: #25352A;
     
-    --muted: #F8FAFC;
-    --muted-foreground: #64748B;
+    --muted: #F2F5EE;
+    --muted-foreground: #617066;
     
-    --accent: #F1F5F9;
-    --accent-foreground: #0F172A;
+    --accent: #F3E9D6;
+    --accent-foreground: #65431F;
     
-    --destructive: #EF4444;
+    --destructive: #B5483F;
     --destructive-foreground: #FFFFFF;
     
-    --border: #E2E8F0;
-    --input: #E2E8F0;
-    --ring: #10B981;
+    --border: #DCE4DA;
+    --input: #CFD9CD;
+    --ring: #25633E;
     
-    --radius: 0.5rem;
+    --radius: 0.625rem;
   }
 
   .dark {
-    --background: #020617;
-    --foreground: #F8FAFC;
+    --background: #111713;
+    --foreground: #F2F5EE;
     
-    --card: #0F172A;
-    --card-foreground: #F8FAFC;
+    --card: #18201B;
+    --card-foreground: #F2F5EE;
     
-    --popover: #0F172A;
-    --popover-foreground: #F8FAFC;
+    --popover: #18201B;
+    --popover-foreground: #F2F5EE;
     
-    --primary: #10B981;
-    --primary-foreground: #FFFFFF;
+    --primary: #70B98B;
+    --primary-foreground: #102016;
     
-    --secondary: #1E293B;
-    --secondary-foreground: #F8FAFC;
+    --secondary: #202A23;
+    --secondary-foreground: #F2F5EE;
     
-    --muted: #1E293B;
-    --muted-foreground: #94A3B8;
+    --muted: #202A23;
+    --muted-foreground: #AAB6AD;
     
-    --accent: #1E293B;
-    --accent-foreground: #F8FAFC;
+    --accent: #322A20;
+    --accent-foreground: #E5C998;
     
-    --destructive: #EF4444;
-    --destructive-foreground: #FFFFFF;
+    --destructive: #E68178;
+    --destructive-foreground: #24100E;
     
-    --border: #1E293B;
-    --input: #1E293B;
-    --ring: #10B981;
+    --border: #344039;
+    --input: #435047;
+    --ring: #70B98B;
   }
 }
 
@@ -120,6 +121,27 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
+    min-height: 100vh;
+    font-variant-numeric: proportional-nums;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

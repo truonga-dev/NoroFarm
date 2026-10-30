@@ -30,7 +30,7 @@ export function NotificationBell() {
       const res = await notificationService.getNotifications(0, 10)
       return res
     },
-    refetchInterval: 30000 // Refetch mỗi 30s
+    refetchInterval: 15000 // Refetch mỗi 15s
   })
 
   const notifications = notifData?.data || []
@@ -141,6 +141,16 @@ export function NotificationBell() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="border-t bg-muted/30 p-2.5 flex items-center justify-between text-xs">
+            <Link
+              href="/dashboard/alerts"
+              className="text-primary font-medium hover:underline w-full text-center py-1"
+              onClick={() => setIsOpen(false)}
+            >
+              Quản lý cảnh báo giá nông sản →
+            </Link>
           </div>
         </div>
       )}

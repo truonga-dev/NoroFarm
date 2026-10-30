@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast-context"
 import { contactService } from "@/api/services/contact.service"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 export default function AdminContactsPage() {
   const [filterReplied, setFilterReplied] = React.useState<string>("") // "", "true", "false"
@@ -61,16 +62,11 @@ export default function AdminContactsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Quản lý Phản Hồi Liên Hệ</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Tiếp nhận ý kiến khách hàng và gửi email phản hồi trực tiếp từ hệ thống.
-        </p>
-      </div>
+      <AdminPageHeader eyebrow="Chăm sóc khách hàng" title="Phản hồi liên hệ" description="Tiếp nhận yêu cầu và gửi phản hồi trực tiếp tới khách hàng." />
 
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-background p-4 rounded-xl border shadow-sm">
+      <AdminToolbar>
         <select
-          className="h-10 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full md:w-auto"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring md:w-auto"
           value={filterReplied}
           onChange={(e) => { setFilterReplied(e.target.value); setPage(1); }}
         >
@@ -78,9 +74,10 @@ export default function AdminContactsPage() {
           <option value="false">Chờ phản hồi</option>
           <option value="true">Đã phản hồi</option>
         </select>
-      </div>
+        <p className="text-sm text-muted-foreground md:ml-auto">{contacts.length} yêu cầu</p>
+      </AdminToolbar>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -96,7 +93,7 @@ export default function AdminContactsPage() {
               {isLoading ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Đang tải...</td></tr>
               ) : contacts.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Không tìm thấy phản hồi liên hệ nào.</td></tr>
+                <tr><td colSpan={5}><AdminEmptyState title="Không có yêu cầu phù hợp" description="Thử thay đổi bộ lọc trạng thái phản hồi." /></td></tr>
               ) : (
                 contacts.map((c: any) => (
                   <tr key={c.id} className="hover:bg-muted/50 transition-colors align-top">
@@ -146,7 +143,7 @@ export default function AdminContactsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
 
       <Dialog open={!!activeReply} onOpenChange={(o) => !o && setActiveReply(null)}>
         <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto rounded-3xl">

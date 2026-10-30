@@ -1,99 +1,135 @@
-"use client"
+'use client'
 
-import * as React from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import * as React from 'react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeft,
-  ArrowUpRight,
+  ArrowRight,
   CalendarDays,
   Check,
-  ChevronRight,
   Clock3,
-  Leaf,
   Link2,
   Newspaper,
   Share2,
-} from "lucide-react"
+} from 'lucide-react'
 
-import { apiClient, getAssetUrl } from "@/api/client"
-import { Container } from "@/components/layout/container"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
+import { apiClient, getAssetUrl } from '@/api/client'
+import { DataState } from '@/components/data-display/data-state'
+import { Container } from '@/components/layout/container'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
 function formatDate(value?: string) {
-  if (!value) return "Mới đăng"
-  return new Intl.DateTimeFormat("vi-VN", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date(value))
+  return value
+    ? new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date(value))
+    : 'Mới đăng'
 }
-
-function getReadingTime(content?: string) {
-  const text = (content || "").replace(/<[^>]*>/g, " ").trim()
-  return Math.max(1, Math.ceil(text.split(/\s+/).filter(Boolean).length / 220))
+function readingTime(content?: string) {
+  const words = (content || '')
+    .replace(/<[^>]*>/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+  return Math.max(1, Math.ceil(words / 220))
 }
-
 function headingId(value: string) {
   return value
-    .toLocaleLowerCase("vi")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
+    .toLocaleLowerCase('vi')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
 }
-
 function InlineText({ value }: { value: string }) {
-  const parts = value.split(/(\*\*[^*]+\*\*)/g)
-  return <>{parts.map((part, index) => part.startsWith("**") && part.endsWith("**")
-    ? <strong key={index}>{part.slice(2, -2)}</strong>
-    : <React.Fragment key={index}>{part}</React.Fragment>)}</>
+  return (
+    <>
+      {value
+        .split(/(\*\*[^*]+\*\*)/g)
+        .map((part, index) =>
+          part.startsWith('**') && part.endsWith('**') ? (
+            <strong key={index}>{part.slice(2, -2)}</strong>
+          ) : (
+            <React.Fragment key={index}>{part}</React.Fragment>
+          )
+        )}
+    </>
+  )
 }
 
 function ArticleBody({ content }: { content: string }) {
-  const hasHtml = /<[a-z][\s\S]*>/i.test(content)
-
-  if (hasHtml) {
-    return <div className="article-content" dangerouslySetInnerHTML={{ __html: content }} />
+  if (/<[a-z][\s\S]*>/i.test(content)) {
+    const withIds = content.replace(
+      /<h([2-4])([^>]*)>(.*?)<\/h\1>/gi,
+      (_match, level, attrs, inner) => {
+        const title = inner.replace(/<[^>]+>/g, '').trim()
+        const id = headingId(title)
+        const cleanedAttrs = String(attrs).replace(/\s+id=(["']).*?\1/i, '')
+        return `<h${level}${cleanedAttrs} id="${id}">${inner}</h${level}>`
+      }
+    )
+    return (
+      <div
+        className="article-content"
+        dangerouslySetInnerHTML={{ __html: withIds }}
+      />
+    )
   }
 
-  const lines = content.replace(/\r\n/g, "\n").split("\n")
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
   const blocks: React.ReactNode[] = []
   let paragraph: string[] = []
   let list: string[] = []
-
   const flushParagraph = () => {
     if (!paragraph.length) return
-    const value = paragraph.join(" ")
-    blocks.push(<p key={`p-${blocks.length}`} className="text-[1.0625rem] leading-8 text-foreground/85"><InlineText value={value} /></p>)
+    const value = paragraph.join(' ')
+    blocks.push(
+      <p
+        key={`p-${blocks.length}`}
+        className="text-foreground/85 text-[1.0625rem] leading-8"
+      >
+        <InlineText value={value} />
+      </p>
+    )
     paragraph = []
   }
   const flushList = () => {
     if (!list.length) return
     blocks.push(
-      <ul key={`ul-${blocks.length}`} className="space-y-3 rounded-2xl border bg-muted/30 p-5 pl-11 text-[1.0625rem] leading-7 marker:text-primary">
-        {list.map((item, index) => <li key={index} className="pl-1"><InlineText value={item} /></li>)}
+      <ul
+        key={`l-${blocks.length}`}
+        className="marker:text-primary list-disc space-y-2 pl-6 text-[1.0625rem] leading-8"
+      >
+        {list.map((item, index) => (
+          <li key={index}>
+            <InlineText value={item} />
+          </li>
+        ))}
       </ul>
     )
     list = []
   }
-
   lines.forEach((rawLine) => {
     const line = rawLine.trim()
     const heading = line.match(/^(#{1,4})\s+(.+)$/)
     const bullet = line.match(/^[-*]\s+(.+)$/)
-
     if (heading) {
       flushParagraph()
       flushList()
-      const title = heading[2]
       blocks.push(
-        <h2 key={`h-${blocks.length}`} id={headingId(title)} className="scroll-mt-28 pt-5 text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">
-          {title}
+        <h2
+          key={`h-${blocks.length}`}
+          id={headingId(heading[2])}
+          className="scroll-mt-24 pt-5 text-2xl font-bold tracking-[-0.02em]"
+        >
+          {heading[2]}
         </h2>
       )
     } else if (bullet) {
@@ -107,244 +143,286 @@ function ArticleBody({ content }: { content: string }) {
       paragraph.push(line)
     }
   })
-
   flushParagraph()
   flushList()
   return <div className="space-y-6">{blocks}</div>
 }
 
-function ArticleImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+function ArticleImage({
+  src,
+  alt,
+  className,
+}: {
+  src?: string
+  alt: string
+  className?: string
+}) {
   const [failed, setFailed] = React.useState(false)
-
-  if (!src || failed) {
+  if (!src || failed)
     return (
-      <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/10 via-muted to-emerald-500/10", className)}>
-        <div className="text-center text-muted-foreground">
-          <Newspaper className="mx-auto h-10 w-10 opacity-30" />
-          <span className="mt-2 block text-xs">NoroFarm News</span>
-        </div>
+      <div
+        className={cn('bg-muted flex items-center justify-center', className)}
+      >
+        <Newspaper className="text-muted-foreground/30 h-10 w-10" />
       </div>
     )
-  }
-
-  return <img src={getAssetUrl(src)} alt={alt} className={className} onError={() => setFailed(true)} />
+  return (
+    <img
+      src={getAssetUrl(src)}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 export default function NewsDetailPage() {
-  const params = useParams<{ slug: string }>()
-  const slug = params.slug
+  const { slug } = useParams<{ slug: string }>()
   const [copied, setCopied] = React.useState(false)
   const [progress, setProgress] = React.useState(0)
 
-  const { data: article, isLoading, isError } = useQuery({
-    queryKey: ["news-detail", slug],
-    queryFn: async () => {
-      const response = await apiClient.get(`/news/${slug}`)
-      return response.data
-    },
+  const articleQuery = useQuery({
+    queryKey: ['news-detail', slug],
+    queryFn: async () => (await apiClient.get(`/news/${slug}`)).data,
     enabled: Boolean(slug),
   })
-
-  const { data: relatedData } = useQuery({
-    queryKey: ["related-news", article?.category_id, slug],
+  const article = articleQuery.data
+  const relatedQuery = useQuery({
+    queryKey: ['related-news', article?.category_id, slug],
     queryFn: async () => {
-      const query: Record<string, string | number | boolean> = {
+      const params: Record<string, string | number | boolean> = {
         size: 4,
-        sort_by: "published_at",
+        sort_by: 'published_at',
         sort_desc: true,
       }
-      if (article?.category_id) query.category_id = article.category_id
-      const response = await apiClient.get("/news", query)
-      return response.data
+      if (article?.category_id) params.category_id = article.category_id
+      return (await apiClient.get('/news', params)).data
     },
     enabled: Boolean(article),
   })
 
   React.useEffect(() => {
-    const updateProgress = () => {
+    const update = () => {
       const height = document.documentElement.scrollHeight - window.innerHeight
-      setProgress(height > 0 ? Math.min(100, (window.scrollY / height) * 100) : 0)
+      setProgress(
+        height > 0 ? Math.min(100, (window.scrollY / height) * 100) : 0
+      )
     }
-    updateProgress()
-    window.addEventListener("scroll", updateProgress, { passive: true })
-    return () => window.removeEventListener("scroll", updateProgress)
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
   }, [])
 
-  const relatedArticles: any[] = relatedData?.items || relatedData?.data?.items || []
-  const filteredRelated = relatedArticles.filter((item) => item.id !== article?.id).slice(0, 3)
-  const readingTime = getReadingTime(article?.content)
-  const tableOfContents = React.useMemo<string[]>(() => {
+  const related = (
+    relatedQuery.data?.items ||
+    relatedQuery.data?.data?.items ||
+    []
+  )
+    .filter((item: any) => item.id !== article?.id)
+    .slice(0, 3)
+  const minutes = readingTime(article?.content)
+  const headings = React.useMemo(() => {
     if (!article?.content) return []
-    const markdownHeadings = article.content
+    const markdown = article.content
       .split(/\r?\n/)
       .map((line: string) => line.match(/^#{1,4}\s+(.+)$/)?.[1]?.trim())
-      .filter((heading: string | undefined): heading is string => Boolean(heading))
-    if (markdownHeadings.length) return markdownHeadings
-    const htmlHeadings: string[] = []
-    const headingPattern = /<h[2-4][^>]*>(.*?)<\/h[2-4]>/gi
+      .filter(Boolean)
+    if (markdown.length) return markdown as string[]
+    const values: string[] = []
+    const pattern = /<h[2-4][^>]*>(.*?)<\/h[2-4]>/gi
     let match: RegExpExecArray | null
-    while ((match = headingPattern.exec(article.content)) !== null) {
-      htmlHeadings.push(match[1].replace(/<[^>]+>/g, "").trim())
-    }
-    return htmlHeadings
+    while ((match = pattern.exec(article.content)) !== null)
+      values.push(match[1].replace(/<[^>]+>/g, '').trim())
+    return values
   }, [article?.content])
 
   const copyLink = async () => {
-    await navigator.clipboard.writeText(window.location.href)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
   }
 
-  if (isLoading) {
+  if (articleQuery.isLoading) {
     return (
-      <main className="min-h-screen bg-background pb-20">
-        <Container className="py-10">
-          <div className="mx-auto max-w-5xl space-y-7">
-            <Skeleton className="h-5 w-52" />
-            <Skeleton className="h-16 w-full max-w-4xl" />
-            <Skeleton className="h-7 w-4/5" />
-            <Skeleton className="aspect-[16/7] w-full rounded-3xl" />
-            <div className="mx-auto max-w-3xl space-y-4">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-4/5" />
-            </div>
-          </div>
-        </Container>
-      </main>
-    )
-  }
-
-  if (isError || !article) {
-    return (
-      <main className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="max-w-md text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Newspaper className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-bold">Không tìm thấy bài viết</h1>
-          <p className="mt-3 text-muted-foreground">Bài viết có thể đã được di chuyển, gỡ bỏ hoặc đường dẫn chưa chính xác.</p>
-          <Button asChild className="mt-7 rounded-full">
-            <Link href="/news"><ArrowLeft className="mr-2 h-4 w-4" /> Quay lại tin tức</Link>
-          </Button>
+      <Container className="py-10">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <Skeleton className="h-5 w-44" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-7 w-3/4" />
+          <Skeleton className="aspect-[16/7] w-full rounded-xl" />
         </div>
-      </main>
+      </Container>
     )
   }
+  if (articleQuery.isError || !article) {
+    return (
+      <Container className="py-12">
+        <DataState
+          icon={<Newspaper className="h-5 w-5" />}
+          title="Không tìm thấy bài viết"
+          description="Bài viết có thể đã được di chuyển, gỡ bỏ hoặc đường dẫn chưa chính xác."
+          action={
+            <Button asChild>
+              <Link href="/news">
+                <ArrowLeft className="h-4 w-4" />
+                Về trang tin
+              </Link>
+            </Button>
+          }
+        />
+      </Container>
+    )
+  }
+
+  const author =
+    article.author?.profile?.full_name ||
+    article.author?.full_name ||
+    'Ban biên tập NoroFarm'
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background pb-20">
-      <div className="fixed inset-x-0 top-0 z-[60] h-0.5 bg-transparent">
-        <div className="h-full bg-primary transition-[width] duration-150" style={{ width: `${progress}%` }} />
+    <main className="pb-16 md:pb-20">
+      <div className="fixed inset-x-0 top-0 z-[60] h-0.5">
+        <div className="bg-primary h-full" style={{ width: `${progress}%` }} />
       </div>
 
-      <div className="border-b bg-gradient-to-b from-primary/[0.07] via-background to-background">
-        <Container className="pb-10 pt-8 md:pb-14 md:pt-10">
-          <div className="mx-auto max-w-6xl">
-            <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground" aria-label="Breadcrumb">
-              <Link href="/" className="hover:text-primary">Trang chủ</Link>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <Link href="/news" className="hover:text-primary">Tin tức</Link>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span className="max-w-[220px] truncate text-foreground">{article.title}</span>
-            </nav>
-
-            <div className="grid items-end gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="border-border bg-card border-b">
+        <Container className="py-7 md:py-10">
+          <nav
+            aria-label="Đường dẫn"
+            className="text-muted-foreground flex items-center gap-2 text-sm"
+          >
+            <Link
+              href="/news"
+              className="hover:text-foreground inline-flex items-center gap-1.5"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Tin tức
+            </Link>
+            <span aria-hidden>/</span>
+            <span className="max-w-56 truncate">
+              {article.category?.name || 'Tin nông nghiệp'}
+            </span>
+          </nav>
+          <div className="mx-auto mt-7 max-w-4xl">
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <span className="text-primary font-semibold">
+                {article.category?.name || 'Tin nông nghiệp'}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays className="h-4 w-4" />
+                {formatDate(article.published_at)}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock3 className="h-4 w-4" />
+                {minutes} phút đọc
+              </span>
+            </div>
+            <h1 className="mt-5 text-3xl leading-[1.15] font-bold tracking-[-0.035em] sm:text-4xl md:text-5xl">
+              {article.title}
+            </h1>
+            {article.summary && (
+              <p className="text-muted-foreground mt-5 max-w-3xl text-lg leading-8">
+                {article.summary}
+              </p>
+            )}
+            <div className="border-border mt-6 flex flex-wrap items-center justify-between gap-4 border-t pt-4">
               <div>
-                <div className="mb-5 flex flex-wrap items-center gap-3 text-sm">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 font-semibold text-primary-foreground shadow-sm">
-                    <Leaf className="h-3.5 w-3.5" />
-                    {article.category?.name || "Tin nông nghiệp"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <CalendarDays className="h-4 w-4" /> {formatDate(article.published_at)}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <Clock3 className="h-4 w-4" /> {readingTime} phút đọc
-                  </span>
-                </div>
-
-                <h1 className="max-w-5xl text-3xl font-black leading-[1.12] tracking-[-0.03em] text-foreground sm:text-4xl md:text-6xl">
-                  {article.title}
-                </h1>
-                {article.summary && (
-                  <p className="mt-6 max-w-4xl text-lg font-medium leading-8 text-muted-foreground md:text-xl">
-                    {article.summary}
-                  </p>
+                <p className="text-sm font-semibold">{author}</p>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Nội dung đã qua biên tập
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={copyLink}>
+                {copied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Share2 className="h-4 w-4" />
                 )}
-              </div>
-
-              <div className="rounded-2xl border bg-card/80 p-4 shadow-sm backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Thực hiện bởi</p>
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-primary to-emerald-400 font-bold text-white">
-                    {(article.author?.profile?.full_name || article.author?.full_name || "N").charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{article.author?.profile?.full_name || article.author?.full_name || "Ban biên tập NoroFarm"}</p>
-                    <p className="text-xs text-muted-foreground">Nội dung đã kiểm duyệt</p>
-                  </div>
-                </div>
-                <Button variant="outline" onClick={copyLink} className="mt-4 w-full rounded-xl gap-2">
-                  {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Share2 className="h-4 w-4" />}
-                  {copied ? "Đã sao chép liên kết" : "Chia sẻ bài viết"}
-                </Button>
-              </div>
+                {copied ? 'Đã sao chép' : 'Chia sẻ'}
+              </Button>
             </div>
           </div>
         </Container>
       </div>
 
-      <Container className="py-10 md:py-14">
-        <div className="mx-auto max-w-6xl">
+      <Container className="py-8 md:py-12">
+        <div className="mx-auto max-w-5xl">
           {article.thumbnail_url && (
-            <figure className="relative mb-12 overflow-hidden rounded-[2rem] border bg-muted shadow-xl shadow-black/5">
+            <figure className="border-border bg-muted mb-10 overflow-hidden rounded-xl border">
               <div className="aspect-[16/8] md:aspect-[16/7]">
-                <ArticleImage src={article.thumbnail_url} alt={article.title} className="h-full w-full object-cover" />
+                <ArticleImage
+                  src={article.thumbnail_url}
+                  alt={article.title}
+                  className="h-full w-full object-cover"
+                />
               </div>
               {article.image_caption && (
-                <figcaption className="border-t bg-card px-5 py-3 text-sm text-muted-foreground">{article.image_caption}</figcaption>
+                <figcaption className="border-border bg-card text-muted-foreground border-t px-4 py-3 text-sm">
+                  {article.image_caption}
+                </figcaption>
               )}
             </figure>
           )}
 
-          <div className="grid gap-10 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center">
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-4">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Bài viết</p>
-                <div className="space-y-2 border-l pl-4 text-sm text-muted-foreground">
-                  <p>{formatDate(article.published_at)}</p>
-                  <p>{readingTime} phút đọc</p>
-                  <button onClick={copyLink} className="flex items-center gap-2 font-medium text-foreground hover:text-primary">
-                    <Link2 className="h-4 w-4" /> Sao chép link
+          <div
+            className={cn(
+              'grid gap-10',
+              headings.length &&
+                'lg:grid-cols-[190px_minmax(0,760px)] lg:justify-center'
+            )}
+          >
+            {headings.length > 0 && (
+              <aside className="hidden lg:block">
+                <div className="sticky top-24">
+                  <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                    Trong bài
+                  </p>
+                  <nav className="border-border mt-3 space-y-2 border-l pl-4">
+                    {headings.map((heading: string, index: number) => (
+                      <a
+                        key={`${heading}-${index}`}
+                        href={`#${headingId(heading)}`}
+                        className="text-muted-foreground hover:text-primary block text-sm leading-5"
+                      >
+                        {heading}
+                      </a>
+                    ))}
+                  </nav>
+                  <button
+                    onClick={copyLink}
+                    className="text-muted-foreground hover:text-foreground mt-6 inline-flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    Sao chép liên kết
                   </button>
                 </div>
-                {tableOfContents.length > 0 && (
-                  <div className="pt-5">
-                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Nội dung chính</p>
-                    <nav className="space-y-2 border-l pl-4">
-                      {tableOfContents.map((heading, index) => (
-                        <a key={`${heading}-${index}`} href={`#${headingId(heading)}`} className="block text-sm leading-5 text-muted-foreground transition-colors hover:text-primary">
-                          {heading}
-                        </a>
-                      ))}
-                    </nav>
-                  </div>
-                )}
-              </div>
-            </aside>
-
-            <article className="min-w-0">
-              <ArticleBody content={article.content || ""} />
-
-              <div className="mt-12 flex flex-col gap-4 rounded-2xl border bg-primary/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+              </aside>
+            )}
+            <article
+              className={cn(
+                'min-w-0',
+                !headings.length && 'mx-auto max-w-[760px]'
+              )}
+            >
+              <ArticleBody content={article.content || ''} />
+              <div className="border-border mt-12 flex flex-col justify-between gap-4 border-t pt-6 sm:flex-row sm:items-center">
                 <div>
-                  <p className="font-bold">Nội dung có hữu ích với bạn?</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Chia sẻ bài viết để nhiều nhà nông cùng tiếp cận kiến thức.</p>
+                  <p className="font-semibold">Chia sẻ kiến thức hữu ích</p>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Gửi bài viết này cho người có thể cần thông tin.
+                  </p>
                 </div>
-                <Button onClick={copyLink} className="shrink-0 rounded-full gap-2">
-                  {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                  {copied ? "Đã sao chép" : "Chia sẻ bài viết"}
+                <Button variant="outline" onClick={copyLink}>
+                  {copied ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Share2 className="h-4 w-4" />
+                  )}
+                  {copied ? 'Đã sao chép' : 'Sao chép liên kết'}
                 </Button>
               </div>
             </article>
@@ -352,38 +430,48 @@ export default function NewsDetailPage() {
         </div>
       </Container>
 
-      {filteredRelated.length > 0 && (
-        <section className="border-t bg-muted/20 py-16 md:py-20">
+      {related.length > 0 && (
+        <section className="border-border bg-muted/30 border-t py-12 md:py-16">
           <Container>
-            <div className="mx-auto max-w-6xl">
-              <div className="mb-8 flex items-end justify-between gap-5">
+            <div className="mx-auto max-w-5xl">
+              <div className="mb-7 flex items-end justify-between">
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-primary">Đọc thêm</p>
-                  <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Bài viết liên quan</h2>
+                  <p className="text-primary text-sm font-semibold">Đọc tiếp</p>
+                  <h2 className="mt-1 text-2xl font-bold">
+                    Bài viết liên quan
+                  </h2>
                 </div>
-                <Button variant="outline" asChild className="hidden rounded-full sm:inline-flex">
-                  <Link href="/news">Tất cả tin tức <ArrowUpRight className="ml-2 h-4 w-4" /></Link>
-                </Button>
+                <Link
+                  href="/news"
+                  className="text-primary hidden items-center gap-1 text-sm font-semibold sm:inline-flex"
+                >
+                  Tất cả bài viết <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
-
               <div className="grid gap-6 md:grid-cols-3">
-                {filteredRelated.map((related) => (
-                  <Link key={related.id} href={`/news/${related.slug || related.id}`} className="group">
-                    <article className="h-full overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                      <div className="aspect-[16/9] overflow-hidden bg-muted">
-                        {related.thumbnail_url ? (
-                          <ArticleImage src={related.thumbnail_url} alt={related.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                        ) : (
-                          <div className="flex h-full items-center justify-center"><Newspaper className="h-10 w-10 text-muted-foreground/30" /></div>
-                        )}
+                {related.map((item: any) => (
+                  <Link
+                    key={item.id}
+                    href={`/news/${item.slug || item.id}`}
+                    className="group"
+                  >
+                    <article>
+                      <div className="border-border aspect-[16/9] overflow-hidden rounded-xl border">
+                        <ArticleImage
+                          src={item.thumbnail_url}
+                          alt={item.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
                       </div>
-                      <div className="p-5">
-                        <p className="mb-3 text-xs font-medium text-primary">{related.category?.name || "Tin nông nghiệp"}</p>
-                        <h3 className="line-clamp-2 font-bold leading-snug transition-colors group-hover:text-primary">{related.title}</h3>
-                        <p className="mt-4 flex items-center gap-1 text-xs text-muted-foreground">
-                          <CalendarDays className="h-3.5 w-3.5" /> {formatDate(related.published_at)}
-                        </p>
-                      </div>
+                      <p className="text-primary mt-4 text-xs font-semibold">
+                        {item.category?.name || 'Tin nông nghiệp'}
+                      </p>
+                      <h3 className="group-hover:text-primary mt-2 line-clamp-2 leading-snug font-semibold">
+                        {item.title}
+                      </h3>
+                      <p className="text-muted-foreground mt-2 text-xs">
+                        {formatDate(item.published_at)}
+                      </p>
                     </article>
                   </Link>
                 ))}

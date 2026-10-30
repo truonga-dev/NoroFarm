@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { Newspaper, Users, Tag, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Download } from "lucide-react"
+import Link from "next/link"
+import { Newspaper, Users, Tag, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Download, RefreshCw, ShoppingBag, Store, Package } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -25,9 +26,10 @@ import { apiClient } from "@/api/client"
 
 export default function AdminDashboardPage() {
   const [dateRange, setDateRange] = React.useState("this_week")
+  const [isSyncingAll, setIsSyncingAll] = React.useState(false)
   const toast = useToast()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-analytics"],
     queryFn: async () => {
       const res = await apiClient.get("/admin/analytics")
@@ -44,6 +46,44 @@ export default function AdminDashboardPage() {
     traffic_data: []
   }
 
+  const handleSyncAndEvaluate = async () => {
+    try {
+      setIsSyncingAll(true)
+      await apiClient.post("/commodities/crawl-live")
+      await apiClient.post("/notifications/alerts/evaluate")
+      await refetch()
+      toast.success("Đã đồng bộ giá thị trường 2026 và quét toàn bộ cảnh báo giá!")
+    } catch {
+      toast.error("Có lỗi khi đồng bộ dữ liệu hệ thống.")
+    } finally {
+      setIsSyncingAll(false)
+    }
+  }
+
+  const handleExportReport = () => {
+    const headers = ["HangMuc", "GiaTri", "KyBaoCao"]
+    const rows = [
+      ["TongBaiViet", analytics.total_articles, dateRange],
+      ["TongNongSanTheoDoi", analytics.total_commodities, dateRange],
+      ["ThongBaoDangHienThi", analytics.active_announcements, dateRange],
+      ["TongThanhVien", analytics.total_users, dateRange],
+      ...(analytics.traffic_data || []).map((t: any) => [
+        `"Traffic_${t.name}"`,
+        `Views:${t.views}|Users:${t.users}`,
+        dateRange
+      ])
+    ]
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `bao-cao-quan-tri-norofarm-${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success("Đã tải xuống báo cáo quản trị CSV!")
+  }
+
   const STATS = [
     { title: "Tổng Bài viết", value: analytics.total_articles, icon: Newspaper, trend: "Tin tức", isUp: true, desc: "trong cơ sở dữ liệu" },
     { title: "Nông sản theo dõi", value: analytics.total_commodities, icon: Tag, trend: "Mặt hàng", isUp: true, desc: "đang được hệ thống quản lý" },
@@ -51,14 +91,15 @@ export default function AdminDashboardPage() {
     { title: "Người dùng", value: analytics.total_users, icon: Users, trend: "Thành viên", isUp: true, desc: "đã đăng ký" },
   ]
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="space-y-7">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Bảng Điều khiển</h1>
-          <p className="text-muted-foreground mt-2">Theo dõi toàn cảnh hệ thống NoroFarm.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Trung tâm vận hành</p>
+          <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">Bảng điều khiển</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Theo dõi dữ liệu và các tác vụ quan trọng của hệ thống NoroFarm.</p>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={dateRange}
             onChange={e => setDateRange(e.target.value)}
@@ -70,24 +111,53 @@ export default function AdminDashboardPage() {
             <option value="this_year">Năm nay</option>
           </select>
           
-          <Button variant="outline" className="bg-background gap-2" onClick={() => {
-            toast.success("Đã tải xuống báo cáo CSV!")
-          }}>
+          <Button
+            variant="default"
+            className="gap-2"
+            onClick={handleSyncAndEvaluate}
+            disabled={isSyncingAll}
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncingAll ? "animate-spin" : ""}`} />
+            {isSyncingAll ? "Đang đồng bộ..." : "Đồng bộ dữ liệu"}
+          </Button>
+          
+          <Button variant="outline" className="bg-background gap-2" onClick={handleExportReport}>
             <Download className="w-4 h-4" />
-            Xuất báo cáo
+            Xuất báo cáo CSV
           </Button>
         </div>
+      </div>
+
+      {/* Lối tắt vận hành nhanh cho Admin */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Quản lý giá nông sản", href: "/admin/prices", icon: Tag },
+          { label: "Duyệt Tin đăng B2B", href: "/admin/market", icon: Store },
+          { label: "Quản lý Đơn hàng B2C", href: "/admin/orders", icon: ShoppingBag },
+          { label: "Kho Vật tư & Sản phẩm", href: "/admin/products", icon: Package },
+        ].map((action) => (
+          <Link
+            key={action.href}
+            href={action.href}
+            className="flex items-center gap-3 rounded-lg border bg-card p-3.5 text-sm font-semibold transition-colors hover:border-primary/30 hover:bg-primary/[0.04]"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <action.icon className="w-4 h-4" />
+            </div>
+            <span className="truncate">{action.label}</span>
+          </Link>
+        ))}
       </div>
 
       {/* Bento Grid - Top Row: Metric Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {STATS.map((stat, i) => (
-          <Card key={i} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-muted/60 bg-gradient-to-br from-background to-muted/20">
+          <Card key={i} className="border-border/80 bg-card shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}
               </CardTitle>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
                 <stat.icon className="h-4 w-4 text-primary" />
               </div>
             </CardHeader>
@@ -107,7 +177,7 @@ export default function AdminDashboardPage() {
       
       {/* Bento Grid - Bottom Row: Charts and Activities */}
       <div className="grid gap-4 md:grid-cols-7">
-        <Card className="md:col-span-4 lg:col-span-5 hover:shadow-md transition-shadow">
+        <Card className="md:col-span-4 lg:col-span-5">
           <CardHeader>
             <CardTitle>Lưu lượng truy cập (Tuần này)</CardTitle>
             <CardDescription>
@@ -155,7 +225,7 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 lg:col-span-2 hover:shadow-md transition-shadow">
+        <Card className="md:col-span-3 lg:col-span-2">
           <CardHeader>
             <CardTitle>Hoạt động gần đây</CardTitle>
             <CardDescription>

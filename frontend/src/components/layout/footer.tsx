@@ -12,7 +12,7 @@ const QUICK_LINKS = [
   { title: "Về chúng tôi", href: "/about" },
   { title: "Liên hệ", href: "/contact" },
   { title: "Tin tức nông nghiệp", href: "/news" },
-  { title: "Tuyển dụng", href: "/careers" },
+  { title: "Cửa hàng vật tư", href: "/shop" },
 ]
 
 const CATEGORIES = [

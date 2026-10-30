@@ -60,3 +60,4 @@ INSERT INTO news_categories (id, slug, name) VALUES
 INSERT INTO news (category_id, slug, title, excerpt, content, status, published_at) VALUES
     ('77777777-7777-7777-7777-777777777771', 'gia-ca-phe-tang-dot-bien', 'Giá cà phê Robusta tăng đột biến đạt mốc kỷ lục', 'Thị trường cà phê đang chứng kiến sự tăng giá mạnh do lo ngại nguồn cung thiếu hụt từ Brazil và Việt Nam.', 'Nội dung chi tiết bài viết...', 'published', NOW()),
     ('77777777-7777-7777-7777-777777777772', 'ky-thuat-cham-soc-sau-rieng-mua-mua', 'Kỹ thuật chăm sóc sầu riêng mùa mưa', 'Mùa mưa là thời điểm nhạy cảm đối với cây sầu riêng, bà con cần lưu ý các bệnh nấm rễ và thối trái.', 'Nội dung chi tiết bài viết...', 'published', NOW());
+

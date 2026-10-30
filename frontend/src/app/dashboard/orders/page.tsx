@@ -9,6 +9,9 @@ import { useToast } from "@/components/ui/toast-context"
 import { shopService } from "@/api/services/shop.service"
 import { PageTitle } from "@/components/layout/page-title"
 import { Container } from "@/components/layout/container"
+import { PageTransition } from "@/components/layout/page-transition"
+import { Section } from "@/components/layout/section"
+import { Sidebar } from "@/components/layout/sidebar"
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: any }> = {
   PENDING: { label: "Chờ xác nhận", color: "text-yellow-600 bg-yellow-50 border-yellow-200", icon: Clock },
@@ -45,9 +48,14 @@ export default function MyOrdersPage() {
   })
 
   return (
-    <Container className="py-8">
-      <div className="space-y-6">
-        <PageTitle title="Đơn Hàng Của Tôi" description="Quản lý lịch sử mua sắm nông sản trên NoroFarm." />
+    <PageTransition>
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-muted/20 md:flex-row">
+        <Sidebar />
+        <main className="min-w-0 flex-1 overflow-x-hidden">
+          <Section className="py-6 md:py-8 lg:py-10">
+            <Container>
+              <div className="space-y-6">
+                <PageTitle title="Đơn hàng của tôi" description="Theo dõi trạng thái và xem lại lịch sử mua sắm trên NoroFarm." className="pb-0 pt-0" />
 
       <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -108,9 +116,26 @@ export default function MyOrdersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button variant="outline" size="sm" onClick={() => setViewOrder(order)}>
-                          <Eye className="w-4 h-4 mr-2" /> Chi tiết
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          {order.status === "PENDING" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cancelMutation.isPending}
+                              onClick={() => {
+                                if (confirm(`Bạn có chắc muốn hủy đơn hàng #${order.id} không?`)) {
+                                  cancelMutation.mutate(order.id)
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" /> Hủy
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" onClick={() => setViewOrder(order)}>
+                            <Eye className="w-4 h-4 mr-2" /> Chi tiết
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -134,6 +159,25 @@ export default function MyOrdersPage() {
                 <p className="mt-2">Giao đến: <strong>{viewOrder.shipping_address}</strong> (SĐT: {viewOrder.contact_phone})</p>
                 <p>Thanh toán: <strong>{viewOrder.payment_method}</strong> ({viewOrder.payment_status})</p>
               </div>
+
+              {viewOrder.payment_method === "BANK_TRANSFER" && viewOrder.status === "PENDING" && (
+                <div className="rounded-xl border bg-muted/20 p-4 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="bg-white p-2 rounded-xl border shadow-sm shrink-0">
+                    <img
+                      src={`https://img.vietqr.io/image/MB-190288889999-compact2.png?amount=${viewOrder.total_amount}&addInfo=${encodeURIComponent(`NOROFARM DH${viewOrder.id} ${viewOrder.contact_phone || ""}`)}&accountName=${encodeURIComponent("CONG TY CO PHAN NOROFARM")}`}
+                      alt="VietQR Đơn hàng"
+                      className="w-36 h-auto object-contain"
+                    />
+                  </div>
+                  <div className="text-xs space-y-1.5">
+                    <p className="font-bold text-primary text-sm">Quét mã VietQR để hoàn tất thanh toán</p>
+                    <p>Ngân hàng: <strong>MB Bank (Quân Đội)</strong> — STK: <strong>1902 8888 9999</strong></p>
+                    <p>Chủ TK: <strong>CONG TY CO PHAN NOROFARM</strong></p>
+                    <p>Số tiền: <strong className="text-emerald-600">{viewOrder.total_amount.toLocaleString("vi-VN")} đ</strong></p>
+                    <p>Nội dung CK: <strong className="text-primary">NOROFARM DH{viewOrder.id} {viewOrder.contact_phone}</strong></p>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <h3 className="font-semibold mb-3">Sản phẩm đã đặt</h3>
@@ -176,7 +220,11 @@ export default function MyOrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+              </div>
+            </Container>
+          </Section>
+        </main>
       </div>
-    </Container>
+    </PageTransition>
   )
 }

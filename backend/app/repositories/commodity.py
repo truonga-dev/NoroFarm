@@ -32,7 +32,7 @@ class CommodityRepository:
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def get_commodities(self, params: PaginationParams, search: Optional[str] = None, category_id: Optional[int] = None) -> Tuple[List[Commodity], int]:
+    async def get_commodities(self, params: PaginationParams, search: Optional[str] = None, category_id: Optional[int] = None, category: Optional[str] = None) -> Tuple[List[Commodity], int]:
         query = select(Commodity).options(
             joinedload(Commodity.category),
             selectinload(Commodity.prices)
@@ -42,6 +42,21 @@ class CommodityRepository:
             query = query.where((Commodity.name.ilike(f"%{search}%")) | (Commodity.code.ilike(f"%{search}%")))
         if category_id:
             query = query.where(Commodity.category_id == category_id)
+        if category:
+            cat_key = category.strip().lower()
+            if cat_key in ("coffee", "ca-phe", "cà phê"):
+                query = query.outerjoin(CommodityCategory).where(
+                    (Commodity.code.ilike("coffee%")) |
+                    (Commodity.code.ilike("ca_phe%")) |
+                    (Commodity.name.ilike("%cà phê%")) |
+                    (CommodityCategory.name.ilike("%cà phê%"))
+                )
+            else:
+                query = query.outerjoin(CommodityCategory).where(
+                    (Commodity.code.ilike(f"%{cat_key}%")) |
+                    (Commodity.name.ilike(f"%{cat_key}%")) |
+                    (CommodityCategory.name.ilike(f"%{cat_key}%"))
+                )
             
         if params.sort_by and hasattr(Commodity, params.sort_by):
             order_col = getattr(Commodity, params.sort_by)
@@ -153,7 +168,22 @@ class CommodityRepository:
             .order_by(asc(CommodityPrice.date))
         )
         result = await self.db.execute(query)
-        return list(result.scalars().all())
+        recent_rows = list(result.scalars().all())
+        distinct_days = {r.date.date() for r in recent_rows if r.date}
+        if len(distinct_days) >= min(days, 5):
+            return recent_rows
+
+        # Fallback: lấy các bản ghi lịch sử gần nhất của mặt hàng này để dựng chuỗi ngày liên tục
+        fallback_q = (
+            select(CommodityPrice)
+            .where(CommodityPrice.commodity_id == commodity_id)
+            .order_by(desc(CommodityPrice.date), desc(CommodityPrice.id))
+            .limit(max(days, 30))
+        )
+        fb_res = await self.db.execute(fallback_q)
+        fb_rows = list(fb_res.scalars().all())
+        fb_rows.reverse()
+        return fb_rows
 
     async def get_top_movers(self, limit: int = 10) -> List[dict]:
         """
@@ -198,11 +228,18 @@ class CommodityRepository:
             if not commodity:
                 continue
 
-            # Lấy giá trước đó (second latest)
-            prices_sorted = sorted(commodity.prices, key=lambda p: p.date, reverse=True)
-            prev_price = prices_sorted[1].price if len(prices_sorted) > 1 else None
+            # Lấy giá trước đó (ưu tiên mốc giá khác với giá hiện tại để tránh trùng lặp snapshot theo giờ)
+            prices_sorted = sorted(commodity.prices, key=lambda p: (p.date, p.id or 0), reverse=True)
             current_price = latest.price
-            change_pct = None
+            prev_price = None
+            for p in prices_sorted[1:]:
+                if p.price != current_price:
+                    prev_price = p.price
+                    break
+            if prev_price is None and len(prices_sorted) > 1:
+                prev_price = prices_sorted[1].price
+
+            change_pct = 0.0
             if prev_price and prev_price > 0:
                 change_pct = round(((current_price - prev_price) / prev_price) * 100, 2)
 

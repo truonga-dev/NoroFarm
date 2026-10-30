@@ -1,197 +1,122 @@
 "use client"
 
-import * as React from "react"
-import { useQuery } from "@tanstack/react-query"
-import { Coffee, TrendingUp, TrendingDown, RefreshCw } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Coffee, RefreshCw, TrendingDown, TrendingUp } from "lucide-react"
+import { commoditiesService } from "@/api/services/commodities.service"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { commoditiesService } from "@/api/services/commodities.service"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/components/ui/toast-context"
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader } from "@/features/admin/components/admin-page"
 
 export default function AdminCoffeePage() {
   const toast = useToast()
+  const queryClient = useQueryClient()
 
-  // Mock data for the chart since real API might not have enough historical data yet
-  const chartData = [
-    { time: "08:00", robusta: 4050, arabica: 210.5 },
-    { time: "09:00", robusta: 4080, arabica: 212.0 },
-    { time: "10:00", robusta: 4065, arabica: 211.8 },
-    { time: "11:00", robusta: 4100, arabica: 214.2 },
-    { time: "12:00", robusta: 4095, arabica: 213.9 },
-    { time: "13:00", robusta: 4110, arabica: 215.0 },
-    { time: "14:00", robusta: 4120, arabica: 215.3 },
-  ]
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["admin-coffee-realtime"],
+    queryFn: async () => {
+      const response = await commoditiesService.getRealtimePrices(100)
+      return response.data || response
+    },
+  })
 
-  const historyData = [
-    { id: 1, type: "Robusta", price: 4120, unit: "$/tấn", time: "14:00 14/07", trend: "up", diff: "+10" },
-    { id: 2, type: "Arabica", price: 215.3, unit: "¢/lb", time: "14:00 14/07", trend: "up", diff: "+0.3" },
-    { id: 3, type: "Robusta", price: 4110, unit: "$/tấn", time: "13:00 14/07", trend: "up", diff: "+15" },
-    { id: 4, type: "Arabica", price: 215.0, unit: "¢/lb", time: "13:00 14/07", trend: "up", diff: "+1.1" },
-    { id: 5, type: "Robusta", price: 4095, unit: "$/tấn", time: "12:00 14/07", trend: "down", diff: "-5" },
-  ]
+  const allItems: any[] = Array.isArray(data) ? data : data?.data || []
+  const coffeeItems = allItems.filter((item) => {
+    const text = `${item.name || ""} ${item.code || ""} ${item.category || ""}`.toLowerCase()
+    return text.includes("cà phê") || text.includes("coffee") || text.includes("robusta") || text.includes("arabica")
+  })
 
-  const handleSync = () => {
-    toast.info("Đang đồng bộ dữ liệu cà phê...")
-    // Simulate sync
-    setTimeout(() => {
-      toast.success("Đồng bộ thành công!")
-    }, 2000)
-  }
+  const syncMutation = useMutation({
+    mutationFn: () => commoditiesService.crawlLive(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-coffee-realtime"] })
+      await queryClient.invalidateQueries({ queryKey: ["admin-commodities-list"] })
+      toast.success("Đã đồng bộ dữ liệu thị trường")
+    },
+    onError: () => toast.error("Không thể đồng bộ dữ liệu lúc này"),
+  })
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Thị trường Cà phê</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Theo dõi và quản lý bảng giá cà phê trực tuyến (Robusta, Arabica)
-          </p>
-        </div>
-        <Button onClick={handleSync} className="gap-2">
-          <RefreshCw className="w-4 h-4" />
-          Đồng bộ ngay
-        </Button>
-      </div>
+      <AdminPageHeader
+        eyebrow="Dữ liệu chuyên ngành"
+        title="Thị trường cà phê"
+        description="Theo dõi báo giá cà phê thực tế đang được lưu trong hệ thống NoroFarm."
+        actions={
+          <Button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="gap-2">
+            <RefreshCw className={`h-4 w-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+            {syncMutation.isPending ? "Đang đồng bộ" : "Đồng bộ dữ liệu"}
+          </Button>
+        }
+      />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Robusta London</CardTitle>
-            <Coffee className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">$4,120</div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 text-emerald-600">
-              <TrendingUp className="w-3 h-3" /> +12.5% so với hôm qua
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Arabica New York</CardTitle>
-            <Coffee className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">¢215.30</div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1 text-red-600">
-              <TrendingDown className="w-3 h-3" /> -1.2% so với hôm qua
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      {isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-lg" />)}
+        </div>
+      ) : coffeeItems.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {coffeeItems.slice(0, 4).map((item) => {
+            const change = Number(item.change_pct || 0)
+            return (
+              <Card key={item.id} className="shadow-sm">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="truncate text-sm font-medium">{item.name}</CardTitle>
+                  <Coffee className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">{Number(item.current_price || 0).toLocaleString("vi-VN")} <span className="text-sm font-medium text-muted-foreground">{item.currency || "VND"}</span></p>
+                  <p className={`mt-1 flex items-center gap-1 text-xs ${change > 0 ? "text-emerald-600" : change < 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                    {change > 0 ? <TrendingUp className="h-3 w-3" /> : change < 0 ? <TrendingDown className="h-3 w-3" /> : null}
+                    {change > 0 ? "+" : ""}{change.toFixed(2)}% · {item.unit}
+                  </p>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      ) : null}
 
-      <div className="bg-background rounded-xl border shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-          <h3 className="text-lg font-medium">Biểu đồ biến động giá</h3>
-          <Tabs defaultValue="today" className="w-full md:w-auto">
-            <TabsList className="grid w-full grid-cols-3 h-9">
-              <TabsTrigger value="today">Hôm nay</TabsTrigger>
-              <TabsTrigger value="7d">7 Ngày</TabsTrigger>
-              <TabsTrigger value="1m">1 Tháng</TabsTrigger>
-            </TabsList>
-          </Tabs>
+      <AdminDataPanel>
+        <div className="border-b px-5 py-4">
+          <h2 className="font-semibold">Bảng giá cà phê hiện tại</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Dữ liệu lấy trực tiếp từ API giá thị trường của hệ thống.</p>
         </div>
-        
-        <div className="h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="colorRobusta" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorArabica" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground))" opacity={0.2} />
-              <XAxis dataKey="time" axisLine={false} tickLine={false} tickMargin={10} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-              <YAxis yAxisId="left" orientation="left" axisLine={false} tickLine={false} tickMargin={10} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-              <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tickMargin={10} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-              <Tooltip 
-                contentStyle={{ 
-                  borderRadius: '12px', 
-                  border: '1px solid hsl(var(--border))', 
-                  backgroundColor: 'hsl(var(--background))',
-                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)'
-                }}
-                itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 500 }}
-                labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: '4px' }}
-              />
-              <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-              <Area 
-                yAxisId="left"
-                type="monotone" 
-                dataKey="robusta" 
-                name="Robusta ($/tấn)" 
-                stroke="#8b5cf6" 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorRobusta)"
-                activeDot={{ r: 6, strokeWidth: 0 }} 
-              />
-              <Area 
-                yAxisId="right"
-                type="monotone" 
-                dataKey="arabica" 
-                name="Arabica (¢/lb)" 
-                stroke="#10b981" 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorArabica)"
-                activeDot={{ r: 6, strokeWidth: 0 }} 
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b">
-          <h3 className="text-lg font-medium">Lịch sử cập nhật giá</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/50 text-muted-foreground font-medium">
-              <tr>
-                <th className="px-6 py-3 whitespace-nowrap">Thời gian</th>
-                <th className="px-6 py-3 whitespace-nowrap">Loại Cà phê</th>
-                <th className="px-6 py-3 whitespace-nowrap">Mức giá</th>
-                <th className="px-6 py-3 whitespace-nowrap text-right">Biến động</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {historyData.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/50 transition-colors">
-                  <td className="px-6 py-4 text-muted-foreground">{item.time}</td>
-                  <td className="px-6 py-4 font-medium flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${item.type === 'Robusta' ? 'bg-[#8b5cf6]' : 'bg-[#10b981]'}`}></div>
-                    {item.type}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-semibold text-foreground">
-                      {item.price.toLocaleString('en-US')}
-                    </span>
-                    <span className="text-muted-foreground ml-1 text-xs">{item.unit}</span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${
-                      item.trend === 'up' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 
-                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                    }`}>
-                      {item.trend === 'up' ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {item.diff}
-                    </span>
-                  </td>
+        {isError ? (
+          <AdminEmptyState title="Không thể tải dữ liệu" description="Kiểm tra kết nối backend và thử đồng bộ lại." />
+        ) : !isLoading && coffeeItems.length === 0 ? (
+          <AdminEmptyState title="Chưa có dữ liệu cà phê" description="Hãy đồng bộ dữ liệu hoặc thêm mặt hàng cà phê trong Bảng giá." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Mặt hàng</th>
+                  <th className="px-5 py-3 font-medium">Giá hiện tại</th>
+                  <th className="px-5 py-3 font-medium">Giá trước</th>
+                  <th className="px-5 py-3 font-medium">Biến động</th>
+                  <th className="px-5 py-3 font-medium">Cập nhật</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody className="divide-y">
+                {coffeeItems.map((item) => {
+                  const change = Number(item.change_pct || 0)
+                  return (
+                    <tr key={item.id} className="hover:bg-muted/40">
+                      <td className="px-5 py-4"><p className="font-medium">{item.name}</p><p className="text-xs text-muted-foreground">{item.code} · {item.unit}</p></td>
+                      <td className="whitespace-nowrap px-5 py-4 font-semibold">{Number(item.current_price || 0).toLocaleString("vi-VN")} {item.currency || "VND"}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-muted-foreground">{item.prev_price != null ? `${Number(item.prev_price).toLocaleString("vi-VN")} ${item.currency || "VND"}` : "—"}</td>
+                      <td className={`whitespace-nowrap px-5 py-4 font-medium ${change > 0 ? "text-emerald-600" : change < 0 ? "text-red-600" : "text-muted-foreground"}`}>{change > 0 ? "+" : ""}{change.toFixed(2)}%</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-muted-foreground">{item.updated_at ? new Date(item.updated_at).toLocaleString("vi-VN") : "—"}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </AdminDataPanel>
     </div>
   )
 }

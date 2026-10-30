@@ -1,17 +1,18 @@
-import { PageTransition } from "@/components/layout/page-transition"
-import { MarketTicker } from "@/components/layout/market-ticker"
-import { HeroSection } from "@/features/landing/sections/hero-section"
-import { QuickOverview } from "@/features/landing/sections/quick-overview"
-import { CommodityHighlight } from "@/features/landing/sections/commodity-highlight"
-import { WeatherPreview } from "@/features/landing/sections/weather-preview"
-import { MarketTrend } from "@/features/landing/sections/market-trend"
-import { LatestNews } from "@/features/landing/sections/latest-news"
-import { MarketplacePreview } from "@/features/landing/sections/marketplace-preview"
-import { FeaturesSection } from "@/features/landing/sections/features-section"
-import { WhyChooseUs } from "@/features/landing/sections/why-choose-us"
-import { CtaSection } from "@/features/landing/sections/cta-section"
-import { API_URL } from "@/api/client"
-import { Suspense } from "react"
+import { PageTransition } from '@/components/layout/page-transition'
+import { MarketTicker } from '@/components/layout/market-ticker'
+import { HeroSection } from '@/features/landing/sections/hero-section'
+import { QuickOverview } from '@/features/landing/sections/quick-overview'
+import { CommodityHighlight } from '@/features/landing/sections/commodity-highlight'
+import { WeatherPreview } from '@/features/landing/sections/weather-preview'
+import { MarketTrend } from '@/features/landing/sections/market-trend'
+import { LatestNews } from '@/features/landing/sections/latest-news'
+import { MarketplacePreview } from '@/features/landing/sections/marketplace-preview'
+import { FeaturesSection } from '@/features/landing/sections/features-section'
+import { WhyChooseUs } from '@/features/landing/sections/why-choose-us'
+import { CtaSection } from '@/features/landing/sections/cta-section'
+import { PlatformDirectory } from '@/features/landing/sections/platform-directory'
+import { API_URL } from '@/api/client'
+import { Suspense } from 'react'
 
 async function getHomeItems(path: string): Promise<any[]> {
   try {
@@ -30,39 +31,47 @@ async function getHomeItems(path: string): Promise<any[]> {
 }
 
 function FeedFallback() {
-  return <div className="mx-auto h-48 w-full max-w-7xl animate-pulse rounded-2xl bg-muted/40" aria-hidden="true" />
+  return (
+    <div
+      className="bg-muted/40 mx-auto h-48 w-full max-w-7xl animate-pulse rounded-2xl"
+      aria-hidden="true"
+    />
+  )
 }
 
 async function CommodityFeed() {
-  const commodities = await getHomeItems("/commodities?size=4")
+  const commodities = await getHomeItems('/commodities?size=4')
   return <CommodityHighlight initialData={commodities} />
 }
 
 async function MarketFeed() {
-  const marketPosts = await getHomeItems("/market?size=4")
+  const marketPosts = await getHomeItems('/market?size=4')
   return <MarketTrend initialData={marketPosts} />
 }
 
 async function NewsFeed() {
-  const news = await getHomeItems("/news?skip=0&limit=3")
+  const news = await getHomeItems('/news?skip=0&limit=3')
   return <LatestNews initialData={news} />
 }
 
 export default function HomePage() {
-
   return (
     <PageTransition>
       <MarketTicker />
-      <div className="flex flex-col gap-16 pb-16 md:gap-24 md:pb-24 pt-4">
+      <div className="flex flex-col gap-12 pb-16 md:gap-20 md:pb-24">
         <HeroSection />
         <QuickOverview />
-        <Suspense fallback={<FeedFallback />}><CommodityFeed /></Suspense>
+        <Suspense fallback={<FeedFallback />}>
+          <CommodityFeed />
+        </Suspense>
         <WeatherPreview />
-        <Suspense fallback={<FeedFallback />}><MarketFeed /></Suspense>
-        <Suspense fallback={<FeedFallback />}><NewsFeed /></Suspense>
-        <MarketplacePreview />
-        <FeaturesSection />
-        <WhyChooseUs />
+        <Suspense fallback={<FeedFallback />}>
+          <MarketFeed />
+        </Suspense>
+        <Suspense fallback={<FeedFallback />}>
+          <NewsFeed />
+        </Suspense>
+        <PlatformDirectory />
         <CtaSection />
       </div>
     </PageTransition>

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { createPortal } from "react-dom"
 import { 
   Menu, X, User, Home, Coffee, Sprout, 
-  CloudSun, Newspaper, TrendingUp, Store, PhoneCall 
+  CloudSun, Newspaper, TrendingUp, Store, ShoppingCart, PhoneCall 
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -17,12 +17,13 @@ import { useAuth } from "@/hooks/useAuth"
 
 const MAIN_NAV_ITEMS = [
   { title: "Trang chủ", href: "/", icon: Home },
-  { title: "Giá cà phê", href: "/coffee", icon: Coffee },
-  { title: "Giá nông sản", href: "/commodities", icon: Sprout },
-  { title: "Thời tiết", href: "/weather", icon: CloudSun },
-  { title: "Tin tức", href: "/news", icon: Newspaper },
-  { title: "Xu hướng", href: "/market", icon: TrendingUp },
-  { title: "Marketplace", href: "/marketplace", icon: Store },
+  { title: "Giá Cà phê 2026", href: "/coffee", icon: Coffee },
+  { title: "Bảng giá Nông sản", href: "/commodities", icon: Sprout },
+  { title: "Sàn B2B (Marketplace)", href: "/marketplace", icon: Store },
+  { title: "Cửa hàng Vật tư", href: "/shop", icon: ShoppingCart },
+  { title: "Thời tiết Nông vụ", href: "/weather", icon: CloudSun },
+  { title: "Tin tức & Phân tích", href: "/news", icon: Newspaper },
+  { title: "Cảnh báo giá", href: "/dashboard/alerts", icon: TrendingUp },
   { title: "Liên hệ", href: "/contact", icon: PhoneCall },
 ]
 

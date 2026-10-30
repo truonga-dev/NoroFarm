@@ -2,9 +2,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 // Mảng các routes cần bảo vệ
-const protectedRoutes = ['/dashboard', '/settings', '/marketplace']
+const protectedRoutes = ['/dashboard', '/settings']
 const adminRoutes = ['/admin']
-const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/admin-login']
+const authRoutes = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/admin-login',
+]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -14,7 +21,10 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = hasAccessToken || hasRefreshToken
 
   // Nếu truy cập protected routes nhưng chưa đăng nhập -> chuyển hướng về login
-  if (!isAuthenticated && protectedRoutes.some(route => pathname.startsWith(route))) {
+  if (
+    !isAuthenticated &&
+    protectedRoutes.some((route) => pathname.startsWith(route))
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirect', pathname)
@@ -35,7 +45,10 @@ export function middleware(request: NextRequest) {
   // Middleware chỉ đảm bảo đã có token.
 
   // Nếu truy cập auth routes nhưng ĐÃ đăng nhập -> chuyển hướng về dashboard
-  if (isAuthenticated && authRoutes.some(route => pathname.startsWith(route))) {
+  if (
+    isAuthenticated &&
+    authRoutes.some((route) => pathname.startsWith(route))
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
@@ -49,7 +62,6 @@ export const config = {
   matcher: [
     '/dashboard/:path*',
     '/settings/:path*',
-    '/marketplace/:path*',
     '/admin/:path*',
     '/login',
     '/register',

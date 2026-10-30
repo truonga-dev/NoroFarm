@@ -2,12 +2,13 @@
 
 import * as React from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Search, Eye, CheckCircle, Truck, XCircle, Clock } from "lucide-react"
+import { Search, Eye, CheckCircle, Truck, XCircle, Clock, Download, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/toast-context"
 import { shopService } from "@/api/services/shop.service"
+import { AdminDataPanel, AdminEmptyState, AdminPageHeader, AdminToolbar } from "@/features/admin/components/admin-page"
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: any }> = {
   PENDING: { label: "Chờ xác nhận", color: "text-yellow-600 bg-yellow-50 border-yellow-200", icon: Clock },
@@ -19,6 +20,7 @@ const STATUS_MAP: Record<string, { label: string, color: string, icon: any }> = 
 
 export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = React.useState("")
+  const [searchQuery, setSearchQuery] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [viewOrder, setViewOrder] = React.useState<any>(null)
   
@@ -27,10 +29,51 @@ export default function AdminOrdersPage() {
 
   const { data: ordersData, isLoading } = useQuery({
     queryKey: ["admin-orders", page, statusFilter],
-    queryFn: () => shopService.adminGetOrders({ page, size: 20, status: statusFilter || undefined })
+    queryFn: () => shopService.adminGetOrders({ page, size: 50, status: statusFilter || undefined })
   })
   
-  const orders = ordersData?.data?.items || []
+  const rawOrders: any[] = ordersData?.data?.items || []
+  const orders = rawOrders.filter((o: any) => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase()
+    return (
+      String(o.id).includes(q) ||
+      String(o.contact_phone || "").toLowerCase().includes(q) ||
+      String(o.shipping_address || "").toLowerCase().includes(q)
+    )
+  })
+
+  const totalRevenue = rawOrders
+    .filter((o: any) => o.status !== "CANCELLED")
+    .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0)
+  const pendingCount = rawOrders.filter((o: any) => o.status === "PENDING").length
+  const shippingCount = rawOrders.filter((o: any) => o.status === "SHIPPING").length
+
+  const handleExportOrdersCsv = () => {
+    if (!orders.length) {
+      toast.error("Không có đơn hàng nào để xuất CSV")
+      return
+    }
+    const headers = ["MaDon", "NgayDat", "SoDienThoai", "DiaChi", "TongTien_VND", "PhuongThuc", "TrangThai"]
+    const rows = orders.map((o: any) => [
+      o.id,
+      new Date(o.created_at).toISOString().split("T")[0],
+      `"${o.contact_phone || ""}"`,
+      `"${(o.shipping_address || "").replace(/"/g, '""')}"`,
+      o.total_amount,
+      o.payment_method,
+      o.status
+    ])
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `don-hang-b2c-${new Date().toISOString().split("T")[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success("Đã tải xuống danh sách đơn hàng CSV!")
+  }
 
   const updateStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number, status: string }) => shopService.adminUpdateOrderStatus(id, status),
@@ -46,18 +89,50 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quản lý Đơn Hàng B2C</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Theo dõi và xử lý đơn đặt hàng từ hệ thống Cửa hàng.
-          </p>
+      <AdminPageHeader eyebrow="Cửa hàng B2C" title="Quản lý đơn hàng" description="Theo dõi, xác nhận và cập nhật quá trình giao hàng từ cửa hàng NoroFarm." actions={
+        <Button variant="outline" onClick={handleExportOrdersCsv} className="gap-2">
+          <Download className="w-4 h-4" />
+          Xuất CSV
+        </Button>
+      } />
+
+      {/* Thống kê nhanh Đơn hàng B2C */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex items-center justify-between rounded-lg border bg-card p-4 shadow-sm">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Doanh thu đơn hợp lệ</p>
+            <p className="text-xl font-extrabold text-primary">{totalRevenue.toLocaleString("vi-VN")} đ</p>
+          </div>
+          <ShoppingBag className="w-8 h-8 text-primary/30" />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border bg-card p-4 shadow-sm">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Đơn chờ xác nhận</p>
+            <p className="text-xl font-extrabold text-yellow-600">{pendingCount} đơn</p>
+          </div>
+          <Clock className="w-8 h-8 text-yellow-500/30" />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border bg-card p-4 shadow-sm">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">Đang vận chuyển</p>
+            <p className="text-xl font-extrabold text-indigo-600">{shippingCount} đơn</p>
+          </div>
+          <Truck className="w-8 h-8 text-indigo-500/30" />
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row items-center gap-4 bg-background p-4 rounded-xl border shadow-sm">
+      <AdminToolbar>
+        <div className="relative flex-1 w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo mã đơn, số điện thoại, địa chỉ..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <select
-          className="h-10 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring w-full md:w-auto"
+          className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring md:w-auto"
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
         >
@@ -68,9 +143,10 @@ export default function AdminOrdersPage() {
           <option value="COMPLETED">Hoàn thành</option>
           <option value="CANCELLED">Đã hủy</option>
         </select>
-      </div>
+        <p className="text-sm text-muted-foreground md:ml-auto">{orders.length} đơn hàng</p>
+      </AdminToolbar>
 
-      <div className="bg-background rounded-xl border shadow-sm overflow-hidden">
+      <AdminDataPanel>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-muted/50 text-muted-foreground font-medium border-b">
@@ -86,7 +162,7 @@ export default function AdminOrdersPage() {
               {isLoading ? (
                 <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Đang tải...</td></tr>
               ) : orders.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Không có đơn hàng nào.</td></tr>
+                <tr><td colSpan={5}><AdminEmptyState title="Không có đơn hàng" description="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." /></td></tr>
               ) : (
                 orders.map((order: any) => {
                   const statusInfo = STATUS_MAP[order.status]
@@ -123,7 +199,7 @@ export default function AdminOrdersPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </AdminDataPanel>
 
       <Dialog open={!!viewOrder} onOpenChange={(o) => !o && setViewOrder(null)}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
