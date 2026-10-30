@@ -277,31 +277,50 @@ export default function WeatherPage() {
   const useMyLocation = () => {
     setGpsStatus('loading')
 
+    // Check session cache first
+    try {
+      const cached = sessionStorage.getItem('noro_user_coords')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed.latitude && parsed.longitude) {
+          setGpsCoords(parsed)
+          setGpsStatus('active')
+          return
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     const fallbackToIp = async () => {
       try {
-        const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) })
+        const res = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(4000) })
         if (res.ok) {
           const data = await res.json()
           if (data.latitude && data.longitude) {
-            setGpsCoords({
+            const newCoords = {
               latitude: Number(data.latitude),
               longitude: Number(data.longitude),
-            })
+            }
+            setGpsCoords(newCoords)
             setGpsStatus('active')
+            try { sessionStorage.setItem('noro_user_coords', JSON.stringify(newCoords)) } catch {}
             return true
           }
         }
       } catch {
         try {
-          const res2 = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(4000) })
+          const res2 = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) })
           if (res2.ok) {
             const data2 = await res2.json()
             if (data2.latitude && data2.longitude) {
-              setGpsCoords({
+              const newCoords = {
                 latitude: Number(data2.latitude),
                 longitude: Number(data2.longitude),
-              })
+              }
+              setGpsCoords(newCoords)
               setGpsStatus('active')
+              try { sessionStorage.setItem('noro_user_coords', JSON.stringify(newCoords)) } catch {}
               return true
             }
           }
@@ -321,11 +340,13 @@ export default function WeatherPage() {
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setGpsCoords({
+        const newCoords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
-        })
+        }
+        setGpsCoords(newCoords)
         setGpsStatus('active')
+        try { sessionStorage.setItem('noro_user_coords', JSON.stringify(newCoords)) } catch {}
       },
       async (error) => {
         // Fallback to IP geolocation when browser blocks GPS on HTTP origins

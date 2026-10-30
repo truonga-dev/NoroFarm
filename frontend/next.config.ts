@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ["lucide-react", "recharts", "framer-motion"],
   },
   images: {
+    unoptimized: true,
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {

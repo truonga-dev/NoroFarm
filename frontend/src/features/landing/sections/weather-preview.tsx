@@ -24,23 +24,41 @@ export function WeatherPreview() {
 
   useEffect(() => {
     if (activeLoc.query === "") {
+      // Check cache first
+      try {
+        const cached = sessionStorage.getItem("noro_user_coords");
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed.lat && parsed.lon) {
+            setCoords(parsed);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       const fallbackToIp = async () => {
         try {
-          const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(4000) });
+          const res = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(4000) });
           if (res.ok) {
             const data = await res.json();
             if (data.latitude && data.longitude) {
-              setCoords({ lat: Number(data.latitude), lon: Number(data.longitude) });
+              const newCoords = { lat: Number(data.latitude), lon: Number(data.longitude) };
+              setCoords(newCoords);
+              try { sessionStorage.setItem("noro_user_coords", JSON.stringify(newCoords)); } catch {}
               return;
             }
           }
         } catch {
           try {
-            const res2 = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(4000) });
+            const res2 = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(4000) });
             if (res2.ok) {
               const data2 = await res2.json();
               if (data2.latitude && data2.longitude) {
-                setCoords({ lat: Number(data2.latitude), lon: Number(data2.longitude) });
+                const newCoords = { lat: Number(data2.latitude), lon: Number(data2.longitude) };
+                setCoords(newCoords);
+                try { sessionStorage.setItem("noro_user_coords", JSON.stringify(newCoords)); } catch {}
               }
             }
           } catch {
@@ -51,9 +69,12 @@ export function WeatherPreview() {
 
       if (typeof window !== "undefined" && "geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
-          (position) => setCoords({ lat: position.coords.latitude, lon: position.coords.longitude }),
+          (position) => {
+            const newCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
+            setCoords(newCoords);
+            try { sessionStorage.setItem("noro_user_coords", JSON.stringify(newCoords)); } catch {}
+          },
           () => {
-            // Fallback to IP geolocation when browser blocks GPS on HTTP
             fallbackToIp();
           },
           { timeout: 5000 }
