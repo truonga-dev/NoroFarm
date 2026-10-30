@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Newspaper, Users, Tag, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Download, RefreshCw, ShoppingBag, Store, Package } from "lucide-react"
+import { Newspaper, Users, Tag, TrendingUp, Activity, ArrowUpRight, ArrowDownRight, Download, RefreshCw, ShoppingBag, Store, Package, FileSpreadsheet } from "lucide-react"
+import { exportAdminReportToExcel, exportAdminReportToCsv } from "@/lib/export-excel"
 import {
   LineChart,
   Line,
@@ -60,28 +61,29 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const handleExportReport = () => {
-    const headers = ["HangMuc", "GiaTri", "KyBaoCao"]
-    const rows = [
-      ["TongBaiViet", analytics.total_articles, dateRange],
-      ["TongNongSanTheoDoi", analytics.total_commodities, dateRange],
-      ["ThongBaoDangHienThi", analytics.active_announcements, dateRange],
-      ["TongThanhVien", analytics.total_users, dateRange],
-      ...(analytics.traffic_data || []).map((t: any) => [
-        `"Traffic_${t.name}"`,
-        `Views:${t.views}|Users:${t.users}`,
-        dateRange
-      ])
-    ]
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `bao-cao-quan-tri-norofarm-${new Date().toISOString().split("T")[0]}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-    toast.success("Đã tải xuống báo cáo quản trị CSV!")
+  const dateRangeLabels: Record<string, string> = {
+    today: "Hôm nay",
+    this_week: "Tuần này",
+    this_month: "Tháng này",
+    this_year: "Năm nay",
+  }
+
+  const handleExportExcel = () => {
+    try {
+      exportAdminReportToExcel(analytics, dateRangeLabels[dateRange] || "Tuần này")
+      toast.success("Đã xuất báo cáo Excel (.xls) chuyên nghiệp!")
+    } catch {
+      toast.error("Có lỗi khi xuất báo cáo Excel.")
+    }
+  }
+
+  const handleExportCsv = () => {
+    try {
+      exportAdminReportToCsv(analytics, dateRangeLabels[dateRange] || "Tuần này")
+      toast.success("Đã tải xuống file CSV chuẩn hóa!")
+    } catch {
+      toast.error("Có lỗi khi xuất file CSV.")
+    }
   }
 
   const STATS = [
@@ -121,9 +123,23 @@ export default function AdminDashboardPage() {
             {isSyncingAll ? "Đang đồng bộ..." : "Đồng bộ dữ liệu"}
           </Button>
           
-          <Button variant="outline" className="bg-background gap-2" onClick={handleExportReport}>
-            <Download className="w-4 h-4" />
-            Xuất báo cáo CSV
+          <Button
+            variant="outline"
+            className="bg-background gap-2 border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            onClick={handleExportExcel}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            Xuất Excel
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleExportCsv}
+          >
+            <Download className="w-3.5 h-3.5" />
+            CSV
           </Button>
         </div>
       </div>
