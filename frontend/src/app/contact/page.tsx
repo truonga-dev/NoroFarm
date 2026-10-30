@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useMutation } from "@tanstack/react-query"
-import { MapPin, Phone, Mail, Clock, Send, ShieldCheck } from "lucide-react"
+import { MapPin, Phone, Mail, Clock, Send, ShieldCheck, ExternalLink } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -153,16 +153,24 @@ export default function ContactPage() {
         <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Info cards */}
           <div className="bg-muted/30 border rounded-3xl p-6 md:p-8 space-y-6">
-            <h2 className="text-xl font-bold text-foreground">Thông tin liên hệ</h2>
+            <h2 className="text-xl font-bold text-foreground">Thông tin liên hệ chính thức</h2>
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="flex gap-4">
                 <div className="h-10 w-10 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-sm">Văn phòng chính</h4>
-                  <p className="text-muted-foreground text-sm mt-0.5">Số 12, Đường Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh, Việt Nam</p>
+                  <h4 className="font-semibold text-sm">Trụ sở điều hành & Kho vận</h4>
+                  <p className="text-muted-foreground text-sm mt-0.5">Xã Đăk Long, Tỉnh Quảng Ngãi</p>
+                  <a
+                    href="https://www.google.com/maps/search/?api=1&query=14.888946,107.624798"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline mt-1.5"
+                  >
+                    Xem vị trí trên Google Maps <ExternalLink className="h-3 w-3" />
+                  </a>
                 </div>
               </div>
 
@@ -171,9 +179,9 @@ export default function ContactPage() {
                   <Phone className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-sm">Số điện thoại liên hệ</h4>
-                  <p className="text-muted-foreground text-sm mt-0.5">Hotline: 1800 6000 (Miễn phí)</p>
-                  <p className="text-muted-foreground text-sm">Hỗ trợ kỹ thuật: 0988 888 999</p>
+                  <h4 className="font-semibold text-sm">Tổng đài hỗ trợ</h4>
+                  <p className="text-foreground text-base font-bold mt-0.5">1900 1234 56</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">Đường dây nóng kỹ thuật: 0988 888 999</p>
                 </div>
               </div>
 
@@ -183,8 +191,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h4 className="font-semibold text-sm">Hòm thư điện tử</h4>
-                  <p className="text-muted-foreground text-sm mt-0.5">info@norofarm.com</p>
-                  <p className="text-muted-foreground text-sm">support@norofarm.com</p>
+                  <p className="text-muted-foreground text-sm mt-0.5">support@norofarm.vn</p>
+                  <p className="text-muted-foreground text-sm">contact@norofarm.vn</p>
                 </div>
               </div>
 
@@ -195,19 +203,40 @@ export default function ContactPage() {
                 <div>
                   <h4 className="font-semibold text-sm">Thời gian làm việc</h4>
                   <p className="text-muted-foreground text-sm mt-0.5">Thứ 2 - Thứ Bảy: 08:00 - 17:30</p>
-                  <p className="text-muted-foreground text-sm">Chủ Nhật: Nghỉ</p>
+                  <p className="text-muted-foreground text-xs">Chủ Nhật: Trực hotline hỗ trợ 24/7</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Maps / Brand Badge */}
-          <div className="border rounded-3xl p-6 flex items-center gap-4 bg-primary/5">
-            <ShieldCheck className="w-12 h-12 text-primary shrink-0" />
+          {/* Maps Preview Card */}
+          <div className="border rounded-3xl p-6 bg-gradient-to-br from-primary/10 via-muted/60 to-emerald-500/10 flex flex-col justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-background text-primary shadow-xs">
+                <MapPin className="h-5 w-5" />
+              </span>
+              <div>
+                <h4 className="font-bold text-foreground text-sm">Chỉ đường tới NoroFarm</h4>
+                <p className="text-xs text-muted-foreground">Tọa độ: 14.888946, 107.624798 (Quảng Ngãi / Kon Tum)</p>
+              </div>
+            </div>
+            <a
+              href="https://www.google.com/maps/search/?api=1&query=14.888946,107.624798"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-background px-4 py-2.5 text-xs font-semibold text-primary shadow-xs hover:bg-background/90 transition-all border"
+            >
+              Mở chỉ đường trên Google Maps <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+
+          {/* Privacy & Safety Badge */}
+          <div className="border rounded-3xl p-5 flex items-center gap-4 bg-card shadow-xs">
+            <ShieldCheck className="w-10 h-10 text-primary shrink-0" />
             <div>
-              <h3 className="font-bold text-foreground">Cam kết bảo mật & An toàn</h3>
-              <p className="text-muted-foreground text-xs leading-relaxed mt-1">
-                NoroFarm cam kết bảo mật tuyệt đối thông tin cá nhân của bạn. Phản hồi sẽ được xử lý bảo mật và phản hồi trực tiếp tới hòm thư cá nhân.
+              <h3 className="font-bold text-sm text-foreground">Cam kết bảo mật & An toàn</h3>
+              <p className="text-muted-foreground text-xs leading-relaxed mt-0.5">
+                NoroFarm cam kết bảo mật tuyệt đối thông tin cá nhân. Đội ngũ CSKH sẽ phản hồi qua email hoặc hotline trong vòng 24 giờ.
               </p>
             </div>
           </div>

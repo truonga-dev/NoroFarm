@@ -10,6 +10,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { marketService } from "@/api/services/market.service"
 import { Skeleton } from "@/components/ui/skeleton"
+import { getCommodityImage } from "@/lib/commodity-images"
 
 export function MarketTrend({ initialData = [] }: { initialData?: any[] }) {
   const { data: queryData, isLoading } = useQuery({
@@ -64,20 +65,30 @@ export function MarketTrend({ initialData = [] }: { initialData?: any[] }) {
                   className="group relative h-full overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-primary/40 flex flex-col"
                 >
                   <div className="relative aspect-[16/10] bg-muted w-full overflow-hidden border-b border-border/50">
-                    {post.images && post.images.length > 0 ? (
-                      <Image src={post.images[0].image_url} alt={post.title} fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-primary/10 via-muted/60 to-emerald-500/10 group-hover:scale-105 transition-transform duration-500">
-                        <ShoppingCart className="h-8 w-8 text-primary/40 mb-1" />
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          {post.commodity?.name || "Giao dịch B2B"}
-                        </span>
-                      </div>
-                    )}
+                    <Image 
+                      src={post.images && post.images.length > 0 ? post.images[0].image_url : getCommodityImage(post.title, post.commodity?.name)} 
+                      alt={post.title} 
+                      fill 
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" 
+                      className="object-cover group-hover:scale-105 transition-transform duration-500" 
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+                    
                     <div className="absolute top-3 left-3 flex gap-1.5">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wide text-white shadow-sm ${post.post_type === 'SELL' ? 'bg-emerald-600' : 'bg-blue-600'}`}>
                         {post.post_type === 'SELL' ? 'CHÀO BÁN' : 'CẦN MUA'}
                       </span>
+                    </div>
+
+                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-white/95">
+                      <span className="text-[11px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md bg-black/40 backdrop-blur-xs border border-white/10">
+                        {post.commodity?.name || "Nông sản"}
+                      </span>
+                      {post.location && (
+                        <span className="text-[10px] font-medium text-white/80 truncate max-w-[120px]">
+                          {post.location}
+                        </span>
+                      )}
                     </div>
                   </div>
                   

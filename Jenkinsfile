@@ -24,7 +24,7 @@ pipeline {
         FRONTEND_REPO = 'norofarm-frontend'
         SSH_KEY_ID = 'ec2-ssh-key'
         EC2_USER = 'ubuntu'
-        DOCKER_BUILDKIT = '1'
+        DOCKER_BUILDKIT = '0'
     }
 
     stages {
@@ -123,6 +123,8 @@ pipeline {
 
                     sh '''
                         set -eu
+                        export DOCKER_BUILDKIT=0
+
                         echo "Building backend: ${BACKEND_IMG}:${IMAGE_TAG}"
                         docker build \
                           -t "${BACKEND_IMG}:${IMAGE_TAG}" \

@@ -60,7 +60,7 @@ export function CommodityHighlight({ initialData = [] }: { initialData?: any[] }
   return (
     <Section>
       <Container>
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
           <div>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 border border-amber-200 px-3 py-1 text-xs font-bold text-amber-900 mb-2.5">
               Bảng giá Nông sản Chủ lực 2026
@@ -68,8 +68,13 @@ export function CommodityHighlight({ initialData = [] }: { initialData?: any[] }
             <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Thị trường Nông sản Hôm nay</h2>
             <p className="text-muted-foreground mt-1.5">Cập nhật giá thu mua tại vườn và sàn giao dịch theo thời gian thực.</p>
           </div>
-          <Button variant="outline" className="hidden md:flex border-emerald-200 bg-emerald-50/60 text-primary hover:bg-emerald-100/70 font-semibold" asChild>
-            <Link href="/commodities">Xem bảng giá đầy đủ <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          <Button 
+            className="self-start sm:self-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-white" 
+            asChild
+          >
+            <Link href="/commodities">
+              Xem bảng giá đầy đủ <ArrowRight className="ml-1.5 h-4 w-4" />
+            </Link>
           </Button>
         </div>
         
