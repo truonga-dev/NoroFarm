@@ -79,32 +79,65 @@ pipeline {
 
         stage('Build Images') {
             steps {
-                withCredentials([
-                    string(credentialsId: 'AWS_ACCOUNT_ID', variable: 'AWS_ACCOUNT_ID'),
-                    string(credentialsId: 'NEXT_PUBLIC_SUPABASE_URL', variable: 'NEXT_PUBLIC_SUPABASE_URL'),
-                    string(credentialsId: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', variable: 'NEXT_PUBLIC_SUPABASE_ANON_KEY')
-                ]) {
+                script {
+                    def awsAccountId = ""
+                    def supabaseUrl = ""
+                    def supabaseAnonKey = ""
+
+                    try {
+                        withCredentials([string(credentialsId: 'AWS_ACCOUNT_ID', variable: 'VAL')]) {
+                            awsAccountId = env.VAL
+                        }
+                    } catch (Exception e) {
+                        echo "Info: Credential 'AWS_ACCOUNT_ID' not configured in Jenkins."
+                    }
+
+                    try {
+                        withCredentials([string(credentialsId: 'NEXT_PUBLIC_SUPABASE_URL', variable: 'VAL')]) {
+                            supabaseUrl = env.VAL
+                        }
+                    } catch (Exception e) {
+                        echo "Info: Credential 'NEXT_PUBLIC_SUPABASE_URL' not found in Jenkins, defaulting to empty."
+                    }
+
+                    try {
+                        withCredentials([string(credentialsId: 'NEXT_PUBLIC_SUPABASE_ANON_KEY', variable: 'VAL')]) {
+                            supabaseAnonKey = env.VAL
+                        }
+                    } catch (Exception e) {
+                        echo "Info: Credential 'NEXT_PUBLIC_SUPABASE_ANON_KEY' not found in Jenkins, defaulting to empty."
+                    }
+
+                    if (awsAccountId?.trim()) {
+                        env.ECR_REGISTRY = "${awsAccountId.trim()}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
+                        env.BACKEND_IMG = "${env.ECR_REGISTRY}/${env.BACKEND_REPO}"
+                        env.FRONTEND_IMG = "${env.ECR_REGISTRY}/${env.FRONTEND_REPO}"
+                    } else {
+                        env.ECR_REGISTRY = ""
+                        env.BACKEND_IMG = "${env.BACKEND_REPO}"
+                        env.FRONTEND_IMG = "${env.FRONTEND_REPO}"
+                    }
+
+                    env.SB_URL = supabaseUrl ?: ""
+                    env.SB_KEY = supabaseAnonKey ?: ""
+
                     sh '''
                         set -eu
-                        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-                        echo "Building backend ${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG}"
+                        echo "Building backend: ${BACKEND_IMG}:${IMAGE_TAG}"
                         docker build \
-                          -t "${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG}" \
-                          -t "${ECR_REGISTRY}/${BACKEND_REPO}:latest" \
+                          -t "${BACKEND_IMG}:${IMAGE_TAG}" \
+                          -t "${BACKEND_IMG}:latest" \
                           ./backend
 
-                        echo "Building frontend ${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG}"
+                        echo "Building frontend: ${FRONTEND_IMG}:${IMAGE_TAG}"
                         docker build \
                           --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_API_URL}" \
-                          --build-arg "NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}" \
-                          --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}" \
-                          -t "${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG}" \
-                          -t "${ECR_REGISTRY}/${FRONTEND_REPO}:latest" \
+                          --build-arg "NEXT_PUBLIC_SUPABASE_URL=${SB_URL}" \
+                          --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${SB_KEY}" \
+                          -t "${FRONTEND_IMG}:${IMAGE_TAG}" \
+                          -t "${FRONTEND_IMG}:latest" \
                           ./frontend
                     '''
-                    script {
-                        env.ECR_REGISTRY = "${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com"
-                    }
                 }
             }
         }
@@ -118,17 +151,17 @@ pipeline {
                     set -eu
                     docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy:latest image --ignore-unfixed --severity CRITICAL --exit-code 1 \
-                      "${ECR_REGISTRY}/${BACKEND_REPO}:${IMAGE_TAG}"
+                      "${BACKEND_IMG}:${IMAGE_TAG}"
                     docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy:latest image --ignore-unfixed --severity CRITICAL --exit-code 1 \
-                      "${ECR_REGISTRY}/${FRONTEND_REPO}:${IMAGE_TAG}"
+                      "${FRONTEND_IMG}:${IMAGE_TAG}"
                 '''
             }
         }
 
         stage('Push to ECR') {
             when {
-                expression { params.PUSH_TO_ECR || params.DEPLOY_TO_AWS }
+                expression { (params.PUSH_TO_ECR || params.DEPLOY_TO_AWS) && env.ECR_REGISTRY != "" }
             }
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: env.AWS_CREDENTIALS_ID]]) {
