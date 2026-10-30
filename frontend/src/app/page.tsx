@@ -14,6 +14,8 @@ import { PlatformDirectory } from '@/features/landing/sections/platform-director
 import { API_URL } from '@/api/client'
 import { Suspense } from 'react'
 
+export const dynamic = 'force-dynamic'
+
 async function getHomeItems(path: string): Promise<any[]> {
   try {
     const response = await fetch(`${API_URL}${path}`, {
