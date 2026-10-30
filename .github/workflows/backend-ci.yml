@@ -44,6 +44,8 @@ jobs:
       env:
         ENVIRONMENT: test
         REDIS_URL: redis://localhost:6379/0
+        PYTHONPATH: .
+        SECRET_KEY: ci-only-secret-key-not-used-outside-tests
       run: |
         cd backend
-        pytest
+        python -m pytest tests/ -v

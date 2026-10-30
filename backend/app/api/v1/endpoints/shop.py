@@ -166,8 +166,8 @@ async def create_stripe_session(
             success_url=f"{settings.FRONTEND_URL}/checkout?success=true&order_id={order_id}",
             cancel_url=f"{settings.FRONTEND_URL}/checkout?cancelled=true&order_id={order_id}",
             metadata={
-                "order_id": order_id,
-                "user_id": current_user.id
+                "order_id": str(order_id),
+                "user_id": str(current_user.id)
             }
         )
         

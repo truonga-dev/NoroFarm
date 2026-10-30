@@ -17,10 +17,10 @@ async def upload_image(
     current_user: User = Depends(RoleChecker(["admin", "editor", "writer"]))
 ):
     """API upload hình ảnh"""
-    if not file.content_type.startswith("image/"):
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File type not supported. Only images are allowed.")
         
-    ext = file.filename.split(".")[-1]
+    ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
     filename = f"{uuid.uuid4().hex}.{ext}"
     file_path = os.path.join(UPLOAD_DIR, filename)
     

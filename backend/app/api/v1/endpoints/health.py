@@ -80,7 +80,7 @@ async def reset_db(db: AsyncSession = Depends(get_db)) -> ResponseModel[dict]:
             
         return success_response(data={"status": "success"}, message="Database reset and initialized successfully")
     except Exception as e:
-        return error_response(message=f"Database reset failed: {e}")
+        return error_response(message=f"Database reset failed: {e}", data={})
 
 
 

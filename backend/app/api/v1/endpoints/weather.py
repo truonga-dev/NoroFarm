@@ -23,7 +23,10 @@ async def get_current_weather(request: Request, city: Optional[str] = None, lat:
         location_data = await weather_client.get_location_from_ip(client_ip)
         
         # Gọi API thời tiết theo tọa độ từ IP
-        data = await weather_client.get_weather_by_coords(location_data["lat"], location_data["lon"])
+        if location_data and "lat" in location_data and "lon" in location_data:
+            data = await weather_client.get_weather_by_coords(location_data["lat"], location_data["lon"])
+        else:
+            data = None
 
     if not data:
         data = weather_client._fallback_weather(city or "Tây Nguyên")

@@ -17,7 +17,7 @@ class ShopService:
     # =================
     async def get_categories(self) -> List[ProductCategory]:
         result = await self.db.execute(select(ProductCategory))
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def create_category(self, data: ProductCategoryCreate) -> ProductCategory:
         cat = ProductCategory(**data.model_dump())

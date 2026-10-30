@@ -1,9 +1,10 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.requests import HTTPConnection
 
 from app.core.config import settings
 from app.core.security import ALGORITHM
@@ -13,7 +14,7 @@ from app.repositories.user import UserRepository
 from app.schemas.auth import TokenPayload
 
 class OAuth2PasswordBearerWithCookie(OAuth2PasswordBearer):
-    async def __call__(self, request: Request) -> Optional[str]:
+    async def __call__(self, request: HTTPConnection) -> Optional[str]:
         # First try to get token from header
         authorization = request.headers.get("Authorization")
         scheme, param = get_authorization_scheme_param(authorization)
