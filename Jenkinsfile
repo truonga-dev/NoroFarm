@@ -122,7 +122,7 @@ pipeline {
                     env.SB_KEY = supabaseAnonKey ?: ""
 
                     sh '''
-                        set -eu
+                        set -e
                         export DOCKER_BUILDKIT=0
 
                         echo "Building backend: ${BACKEND_IMG}:${IMAGE_TAG}"
@@ -133,9 +133,9 @@ pipeline {
 
                         echo "Building frontend: ${FRONTEND_IMG}:${IMAGE_TAG}"
                         docker build \
-                          --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_API_URL}" \
-                          --build-arg "NEXT_PUBLIC_SUPABASE_URL=${SB_URL}" \
-                          --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${SB_KEY}" \
+                          --build-arg "NEXT_PUBLIC_API_URL=${PUBLIC_API_URL:-}" \
+                          --build-arg "NEXT_PUBLIC_SUPABASE_URL=${SB_URL:-}" \
+                          --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=${SB_KEY:-}" \
                           -t "${FRONTEND_IMG}:${IMAGE_TAG}" \
                           -t "${FRONTEND_IMG}:latest" \
                           ./frontend
