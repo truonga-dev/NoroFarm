@@ -3,5 +3,6 @@
   "python.analysis.extraPaths": [
     "${workspaceFolder}/backend"
   ],
-  "python.analysis.diagnosticsSource": "Pylance + Pyrefly"
+  "python.analysis.diagnosticsSource": "Pylance + Pyrefly",
+  "python.terminal.useEnvFile": true
 }

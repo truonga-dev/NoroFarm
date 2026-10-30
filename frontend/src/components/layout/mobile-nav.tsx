@@ -135,14 +135,14 @@ export function MobileNav() {
   )
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
       <Button
         variant="ghost"
         size="icon"
-        className="mr-2"
+        className="h-8 w-8 sm:h-9 sm:w-9 text-foreground"
         onClick={() => setIsOpen(true)}
       >
-        <Menu className="h-6 w-6" />
+        <Menu className="h-5 w-5" />
         <span className="sr-only">Toggle Menu</span>
       </Button>
 

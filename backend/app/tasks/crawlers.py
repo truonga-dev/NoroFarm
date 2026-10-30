@@ -100,33 +100,6 @@ async def get_or_create_commodity(session, code, name, category_id):
         await session.refresh(commodity)
     return commodity
 
-async def ensure_price_history(session, commodity_id: int, current_price: float, location: str):
-    """Đảm bảo mặt hàng luôn có đủ dữ liệu lịch sử giá cho biểu đồ dashboard (ít nhất 14 ngày)."""
-    try:
-        from datetime import timedelta
-        import random
-        from sqlalchemy import func
-
-        res = await session.execute(
-            select(func.count(CommodityPrice.id)).where(CommodityPrice.commodity_id == commodity_id)
-        )
-        count = res.scalar() or 0
-        if count < 7:
-            now = datetime.now(timezone.utc)
-            price_cursor = current_price
-            for d in range(14, 0, -1):
-                past_date = now - timedelta(days=d)
-                drift = random.uniform(-0.015, 0.015)
-                price_cursor = round(price_cursor * (1 + drift), -2)
-                session.add(CommodityPrice(
-                    commodity_id=commodity_id,
-                    price=price_cursor,
-                    location=location,
-                    date=past_date
-                ))
-    except Exception as e:
-        logger.warning(f"ensure_price_history warning: {e}")
-
 async def fetch_giacaphe_com():
     """Lấy dữ liệu giá cà phê thực tế từ giacaphe.com (giải mã CSS pseudo-elements & bảng thế giới)"""
     logger.info("Bắt đầu crawl dữ liệu giacaphe.com...")
@@ -143,6 +116,7 @@ async def fetch_giacaphe_com():
         
         async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=15.0) as client:
             response = await client.get(url)
+            response.raise_for_status()
             html = response.text
             
         soup = BeautifulSoup(html, "html.parser")
@@ -152,14 +126,13 @@ async def fetch_giacaphe_com():
         
         async with AsyncSessionLocal() as session:
             cat_noidia = await get_or_create_category(session, "Cà phê", "Giá cà phê Tây Nguyên")
-            cat_thegioi = await get_or_create_category(session, "Cà phê Thế giới", "Giá cà phê trên sàn London và New York")
             
             provinces = {
-                "Đắk Lắk": {"aliases": ["Đắk Lắk", "Dak Lak"], "code": "coffee_dak_lak", "fallback": 123500},
-                "Lâm Đồng": {"aliases": ["Lâm Đồng", "Lam Dong"], "code": "coffee_lam_dong", "fallback": 122800},
-                "Gia Lai": {"aliases": ["Gia Lai"], "code": "coffee_gia_lai", "fallback": 123200},
-                "Đắk Nông": {"aliases": ["Đắk Nông", "Dak Nong"], "code": "coffee_dak_nông", "fallback": 123600},
-                "Kon Tum": {"aliases": ["Kon Tum"], "code": "coffee_kon_tum", "fallback": 123000},
+                "Đắk Lắk": {"aliases": ["Đắk Lắk", "Dak Lak"], "code": "coffee_dak_lak"},
+                "Lâm Đồng": {"aliases": ["Lâm Đồng", "Lam Dong"], "code": "coffee_lam_dong"},
+                "Gia Lai": {"aliases": ["Gia Lai"], "code": "coffee_gia_lai"},
+                "Đắk Nông": {"aliases": ["Đắk Nông", "Dak Nong"], "code": "coffee_dak_nông"},
+                "Kon Tum": {"aliases": ["Kon Tum"], "code": "coffee_kon_tum"},
             }
             found_provinces = set()
             
@@ -208,8 +181,9 @@ async def fetch_giacaphe_com():
                         if price_val:
                             if price_val < 1000:
                                 price_val *= 1000
-                            if price_val < 50000:
-                                price_val = float(provinces[location]["fallback"])
+                            if not 50000 <= price_val <= 200000:
+                                logger.warning(f"Bỏ qua giá cà phê bất thường tại {location}: {price_val}")
+                                continue
                                 
                             code = provinces[location]["code"]
                             commodity = await get_or_create_commodity(session, code, f"Cà phê {location}", cat_noidia.id)
@@ -221,84 +195,12 @@ async def fetch_giacaphe_com():
                                 date=datetime.now(timezone.utc)
                             )
                             session.add(new_price)
-                            await ensure_price_history(session, commodity.id, price_val, location)
                             await check_and_trigger_alerts(session, commodity.id, price_val, location)
                             found_provinces.add(location)
                             logger.info(f"Đã lưu giá Cà phê {location}: {price_val}")
 
-            # Đảm bảo tất cả các tỉnh Tây Nguyên đều được cập nhật giá 2026 mới nhất
-            import random
-            for prov_name, p_meta in provinces.items():
-                if prov_name not in found_provinces:
-                    tick = round(random.choice([-500, -300, 200, 400, 600, 800]), -2)
-                    price_val = float(p_meta["fallback"] + tick)
-                    commodity = await get_or_create_commodity(session, p_meta["code"], f"Cà phê {prov_name}", cat_noidia.id)
-                    session.add(CommodityPrice(
-                        commodity_id=commodity.id,
-                        price=price_val,
-                        location=prov_name,
-                        date=datetime.now(timezone.utc)
-                    ))
-                    await ensure_price_history(session, commodity.id, price_val, prov_name)
-
-            # Cập nhật mã chuẩn CA_PHE_RO và CA_PHE_AR
-            for bm_code, bm_name, bm_loc, bm_base in [
-                ("CA_PHE_RO", "Cà phê Robusta (Nhân xô)", "Đắk Lắk", 123500.0),
-                ("CA_PHE_AR", "Cà phê Arabica Cầu Đất", "Lâm Đồng", 164500.0),
-            ]:
-                bm_res = await session.execute(select(Commodity).where(Commodity.code == bm_code))
-                bm_com = bm_res.scalar_one_or_none()
-                if bm_com:
-                    bm_tick = round(random.choice([-600, 400, 700, 900]), -2)
-                    session.add(CommodityPrice(
-                        commodity_id=bm_com.id,
-                        price=bm_base + bm_tick,
-                        location=bm_loc,
-                        date=datetime.now(timezone.utc)
-                    ))
-                            
-            # Bổ sung crawl giá thế giới
-            url_home = "https://giacaphe.com/"
-            async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=15.0) as client:
-                response_home = await client.get(url_home)
-                html_home = response_home.text
-            
-            soup_home = BeautifulSoup(html_home, "html.parser")
-            rows_home = soup_home.find_all("tr")
-            exchange_rate = 25400 # 1 USD = 25400 VNĐ
-            
-            for row in rows_home:
-                cols = row.find_all(["td", "th"])
-                if len(cols) >= 2:
-                    text_0 = cols[0].text.strip()
-                    
-                    # Robusta London (USD/tấn)
-                    if "London" in text_0 or "Robusta" in text_0:
-                        location = "Robusta London"
-                        price_str = cols[1].text.strip().replace(",", "")
-                        match = re.search(r'\d+', price_str)
-                        if match:
-                            price_usd_ton = float(match.group(0))
-                            price_vnd_kg = (price_usd_ton / 1000) * exchange_rate
-                            code = "coffee_robusta_london"
-                            commodity = await get_or_create_commodity(session, code, location, cat_thegioi.id)
-                            session.add(CommodityPrice(commodity_id=commodity.id, price=price_vnd_kg, location=location, date=datetime.now(timezone.utc)))
-                            await ensure_price_history(session, commodity.id, price_vnd_kg, location)
-                            logger.info(f"Đã lưu giá Thế giới {location}: {price_vnd_kg:,.0f} VNĐ/kg")
-                            
-                    # Arabica New York (Cent/lb)
-                    if "New York" in text_0 or "Arabica" in text_0:
-                        location = "Arabica New York"
-                        price_str = cols[1].text.strip().replace(",", "")
-                        match = re.search(r'\d+', price_str)
-                        if match:
-                            price_cent_lb = float(match.group(0))
-                            price_vnd_kg = (price_cent_lb * (exchange_rate / 100)) / 0.453592
-                            code = "coffee_arabica_ny"
-                            commodity = await get_or_create_commodity(session, code, location, cat_thegioi.id)
-                            session.add(CommodityPrice(commodity_id=commodity.id, price=price_vnd_kg, location=location, date=datetime.now(timezone.utc)))
-                            await ensure_price_history(session, commodity.id, price_vnd_kg, location)
-                            logger.info(f"Đã lưu giá Thế giới {location}: {price_vnd_kg:,.0f} VNĐ/kg")
+            if not found_provinces:
+                logger.warning("Không tìm thấy giá cà phê hợp lệ từ nguồn; giữ nguyên dữ liệu cũ.")
  
             await session.commit()
             logger.info("Hoàn tất cập nhật giá cà phê thực tế.")
@@ -350,23 +252,11 @@ async def fetch_pepper_price():
                             code = f"pepper_{location.lower().replace(' ', '_').replace('-', '_')}"
                             commodity = await get_or_create_commodity(session, code, f"Hồ tiêu {location}", cat_pepper.id)
                             session.add(CommodityPrice(commodity_id=commodity.id, price=price_val, location=location, date=datetime.now(timezone.utc)))
-                            await ensure_price_history(session, commodity.id, price_val, location)
                             await check_and_trigger_alerts(session, commodity.id, price_val, location)
                             logger.info(f"Đã lưu giá Hồ tiêu {location}: {price_val}")
                         except ValueError:
                             pass
                             
-            import random
-            bm_pep = await session.execute(select(Commodity).where(Commodity.code == "HO_TIEU"))
-            bm_pep_com = bm_pep.scalar_one_or_none()
-            if bm_pep_com:
-                session.add(CommodityPrice(
-                    commodity_id=bm_pep_com.id,
-                    price=154500.0 + random.choice([-500, 500, 1000]),
-                    location="Đắk Lắk",
-                    date=datetime.now(timezone.utc)
-                ))
-
             await session.commit()
             logger.info("Hoàn tất cập nhật giá Hồ tiêu thực tế.")
     except Exception as e:
@@ -398,7 +288,6 @@ async def fetch_durian_price():
                     date=datetime.now(timezone.utc)
                 )
                 session.add(new_price)
-                await ensure_price_history(session, commodity.id, live_price, item["location"])
                 await check_and_trigger_alerts(session, commodity.id, live_price, item["name"])
 
             for bm_code, bm_loc, bm_base in [
@@ -448,7 +337,6 @@ async def fetch_rice_price():
                     date=datetime.now(timezone.utc)
                 )
                 session.add(new_price)
-                await ensure_price_history(session, commodity.id, live_price, item["location"])
                 await check_and_trigger_alerts(session, commodity.id, live_price, item["name"])
 
             for bm_code, bm_loc, bm_base in [
@@ -494,7 +382,6 @@ async def fetch_rubber_price():
                     date=datetime.now(timezone.utc)
                 )
                 session.add(new_price)
-                await ensure_price_history(session, commodity.id, live_price, item["location"])
                 await check_and_trigger_alerts(session, commodity.id, live_price, item["name"])
 
             for bm_code, bm_loc, bm_base in [
@@ -517,15 +404,12 @@ async def fetch_rubber_price():
         logger.error(f"Lỗi khi cập nhật giá Mủ cao su: {e}")
 
 async def run_all_crawlers():
-    """Chạy tất cả các crawler nông sản với cơ chế cách ly lỗi (Fault Isolation)"""
+    """Chỉ chạy các nguồn giá có thể kiểm chứng; không tạo tick giá ngẫu nhiên."""
     logger.info("--- Bắt đầu chu kỳ Crawl dữ liệu Nông sản toàn diện 2026 ---")
     
     crawlers = [
         ("Cà phê", fetch_giacaphe_com),
         ("Hồ tiêu", fetch_pepper_price),
-        ("Sầu riêng", fetch_durian_price),
-        ("Lúa gạo", fetch_rice_price),
-        ("Mủ cao su", fetch_rubber_price),
     ]
     
     for name, crawler_func in crawlers:

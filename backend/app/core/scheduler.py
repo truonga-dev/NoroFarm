@@ -34,7 +34,10 @@ class Scheduler:
         logger.info(f"Khởi động tác vụ: {task['name']}")
         while self._is_running:
             try:
-                await task["func"]()
+                if task["name"] == "fetch_all_commodity_prices":
+                    await asyncio.wait_for(task["func"](), timeout=120)
+                else:
+                    await task["func"]()
             except Exception as e:
                 logger.error(f"Lỗi khi chạy tác vụ {task['name']}: {e}")
             await asyncio.sleep(task["interval"])

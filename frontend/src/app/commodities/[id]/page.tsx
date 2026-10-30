@@ -110,12 +110,14 @@ export default function CommodityDetailPage() {
     queryFn: async () =>
       (await commoditiesService.getCommodity(commodityId)).data,
     enabled: Number.isFinite(commodityId),
+    refetchInterval: 15_000,
   })
   const historyQuery = useQuery({
     queryKey: ['price-history', commodityId, days],
     queryFn: async () =>
       (await commoditiesService.getPriceHistory(commodityId, days)).data,
     enabled: Number.isFinite(commodityId),
+    refetchInterval: 15_000,
   })
   const watchlistQuery = useQuery({
     queryKey: ['watchlist'],
@@ -152,12 +154,12 @@ export default function CommodityDetailPage() {
     : null
   const chartData = history.map((point) => ({
     ...point,
-    dateLabel: new Date(point.date).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-    }),
-    fullDate: new Date(point.date).toLocaleDateString('vi-VN'),
+    timestamp: new Date(point.date).getTime(),
+    fullDate: new Date(point.date).toLocaleString('vi-VN'),
   }))
+  const chartColor = chartData.length > 1 && chartData.at(-1)!.price < chartData[0].price
+    ? '#ef817a'
+    : '#42c784'
 
   React.useEffect(() => {
     if (currentPrice && !simCostPerUnit)
@@ -373,118 +375,135 @@ export default function CommodityDetailPage() {
                 <div>
                   <h2 className="font-semibold">Diễn biến giá</h2>
                   <p className="text-muted-foreground mt-0.5 text-sm">
-                    Mức giá ghi nhận theo từng ngày
+                    Diễn biến theo thời điểm ghi nhận · tự kiểm tra mỗi 15 giây
                   </p>
                 </div>
-                <div className="bg-muted flex max-w-full gap-1 overflow-x-auto rounded-lg p-1">
-                  {PERIODS.map((period) => (
-                    <button
-                      key={period.value}
-                      onClick={() => setDays(period.value)}
-                      className={`rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap ${days === period.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      {period.label}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="bg-muted flex max-w-full gap-1 overflow-x-auto rounded-lg p-1">
+                    {PERIODS.map((period) => (
+                      <button
+                        key={period.value}
+                        onClick={() => setDays(period.value)}
+                        className={`rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap ${days === period.value ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                      >
+                        {period.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="px-2 py-5 sm:px-4 md:px-5">
-                {historyQuery.isLoading ? (
-                  <Skeleton className="h-72 w-full" />
-                ) : historyQuery.isError ? (
-                  <DataState
-                    className="border-0"
-                    title="Không thể tải lịch sử giá"
-                    action={
-                      <Button
-                        variant="outline"
-                        onClick={() => historyQuery.refetch()}
-                      >
-                        Thử lại
-                      </Button>
-                    }
-                  />
-                ) : !chartData.length ? (
-                  <DataState
-                    className="border-0"
-                    icon={<BarChart3 className="h-5 w-5" />}
-                    title="Chưa có lịch sử giá"
-                    description={`Chưa ghi nhận dữ liệu trong ${days} ngày gần đây.`}
-                  />
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart
-                      data={chartData}
-                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="commodityPriceFill"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
+                  {historyQuery.isLoading ? (
+                    <Skeleton className="h-72 w-full" />
+                  ) : historyQuery.isError ? (
+                    <DataState
+                      className="border-0"
+                      title="Không thể tải lịch sử giá"
+                      action={
+                        <Button
+                          variant="outline"
+                          onClick={() => historyQuery.refetch()}
                         >
-                          <stop
-                            offset="0%"
-                            stopColor="hsl(var(--primary))"
-                            stopOpacity={0.2}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="hsl(var(--primary))"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        stroke="hsl(var(--border))"
-                        strokeDasharray="3 3"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="dateLabel"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{
-                          fill: 'hsl(var(--muted-foreground))',
-                          fontSize: 11,
-                        }}
-                        minTickGap={28}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{
-                          fill: 'hsl(var(--muted-foreground))',
-                          fontSize: 11,
-                        }}
-                        tickFormatter={(value) =>
-                          `${Math.round(value / 1000)}k`
-                        }
-                        width={42}
-                        domain={['auto', 'auto']}
-                      />
-                      <Tooltip content={<ChartTooltip />} />
-                      {avgPrice !== null && (
-                        <ReferenceLine
-                          y={avgPrice}
-                          stroke="hsl(var(--muted-foreground))"
+                          Thử lại
+                        </Button>
+                      }
+                    />
+                  ) : !chartData.length ? (
+                    <DataState
+                      className="border-0"
+                      icon={<BarChart3 className="h-5 w-5" />}
+                      title="Chưa có lịch sử giá"
+                      description={`Chưa ghi nhận dữ liệu trong ${days} ngày gần đây.`}
+                    />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart
+                        data={chartData}
+                        margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="commodityPriceFill"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor={chartColor}
+                              stopOpacity={0.18}
+                            />
+                            <stop
+                              offset="50%"
+                              stopColor={chartColor}
+                              stopOpacity={0.06}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor={chartColor}
+                              stopOpacity={0.01}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          stroke="var(--border)"
+                          strokeOpacity={0.45}
                           strokeDasharray="4 4"
+                          vertical={false}
                         />
-                      )}
-                      <Area
-                        type="monotone"
-                        dataKey="price"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        fill="url(#commodityPriceFill)"
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
+                        <XAxis
+                          dataKey="timestamp"
+                          type="number"
+                          scale="time"
+                          domain={['dataMin', 'dataMax']}
+                          tickCount={7}
+                          tickFormatter={(value) => new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{
+                            fill: 'var(--muted-foreground)',
+                            fontSize: 11,
+                            fontWeight: 500,
+                          }}
+                          minTickGap={20}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{
+                            fill: 'var(--muted-foreground)',
+                            fontSize: 11,
+                            fontWeight: 500,
+                          }}
+                          tickFormatter={(value) =>
+                            `${Math.round(value / 1000)}k`
+                          }
+                          width={46}
+                          domain={['auto', 'auto']}
+                        />
+                        <Tooltip content={<ChartTooltip />} />
+                        {avgPrice !== null && (
+                          <ReferenceLine
+                            y={avgPrice}
+                            stroke={chartColor}
+                            strokeDasharray="4 4"
+                            strokeOpacity={0.6}
+                          />
+                        )}
+                        <Area
+                          type="monotone"
+                          dataKey="price"
+                          stroke={chartColor}
+                          strokeWidth={2.5}
+                          fill="url(#commodityPriceFill)"
+                          dot={chartData.length <= 14 ? { r: 3 } : false}
+                          activeDot={{ r: 5 }}
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
               </div>
             </section>
 

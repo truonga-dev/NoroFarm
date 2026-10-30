@@ -19,5 +19,9 @@ export const commodityService = {
 
   bulkAddPrices: async (data: { prices: Array<{ commodity_id: number, price: number, currency?: string, location?: string }> }) => {
     return apiClient.post('/commodities/bulk-prices', data);
+  },
+
+  getWorldDomesticBoard: async () => {
+    return apiClient.get('/commodities/world-domestic-board');
   }
 };

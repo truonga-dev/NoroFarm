@@ -8,6 +8,7 @@ import { ScrollToTop } from "./scroll-to-top"
 import { AnnouncementBanner } from "./announcement-banner"
 import { AdminHeader } from "@/features/admin/components/admin-header"
 import { NavigationFeedback } from "./navigation-feedback"
+import { NoroFarmAiChat } from "@/components/ai/norofarm-ai-chat"
 
 export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -26,6 +27,7 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
       {children}
       <Footer />
       <ScrollToTop />
+      <NoroFarmAiChat />
     </PageWrapper>
   )
 }

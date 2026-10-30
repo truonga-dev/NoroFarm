@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowDownRight,
   ArrowRight,
@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 
 import { commodityService } from '@/api/services/commodity.service'
-import { commoditiesService } from '@/api/services/commodities.service'
+import { RealtimeTickerBar } from '@/components/commodities/realtime-ticker-bar'
 import { DataState } from '@/components/data-display/data-state'
 import { DataToolbar } from '@/components/data-display/data-toolbar'
 import { Container } from '@/components/layout/container'
@@ -165,7 +165,6 @@ function PriceSkeleton() {
 }
 
 export default function CommoditiesPage() {
-  const queryClient = useQueryClient()
   const toast = useToast()
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -176,6 +175,7 @@ export default function CommoditiesPage() {
   const { data, isLoading, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ['commodities-all'],
     queryFn: () => commodityService.getCommodities({ size: 100 }),
+    refetchInterval: 15_000,
   })
   const { data: categoryData } = useQuery({
     queryKey: ['commodity-categories'],
@@ -235,11 +235,10 @@ export default function CommoditiesPage() {
   const handleLiveSync = async () => {
     try {
       setIsSyncing(true)
-      await commoditiesService.crawlLive()
-      await queryClient.invalidateQueries({ queryKey: ['commodities-all'] })
-      toast.success('Đã đồng bộ bảng giá mới nhất.')
+      await refetch()
+      toast.success('Đã kiểm tra dữ liệu giá mới nhất.')
     } catch {
-      toast.error('Không thể đồng bộ bảng giá lúc này.')
+      toast.error('Không thể làm mới bảng giá lúc này.')
     } finally {
       setIsSyncing(false)
     }
@@ -312,17 +311,32 @@ export default function CommoditiesPage() {
                     className={cn(isSyncing && 'animate-spin')}
                     aria-hidden="true"
                   />
-                  {isSyncing ? 'Đang đồng bộ' : 'Đồng bộ giá'}
+                  {isSyncing ? 'Đang kiểm tra' : 'Làm mới giá'}
                 </Button>
               </div>
             </div>
           </Container>
         </div>
 
-        <Container className="space-y-5 pt-5 md:space-y-6 md:pt-6">
-          {!isLoading && !isError && allCommodities.length > 0 && (
-            <MarketSummary items={allCommodities} />
-          )}
+        <Container className="space-y-6 pt-5 md:space-y-8 md:pt-6">
+          {/* Thanh Ticker Biến Động Thời Gian Thực */}
+          <RealtimeTickerBar className="rounded-2xl" />
+
+          <div className="pt-2">
+            <div className="mb-4">
+              <h2 className="text-foreground text-xl font-bold tracking-tight md:text-2xl">
+                Bảng giá nông sản nội địa chi tiết
+              </h2>
+              <p className="text-muted-foreground mt-1 text-xs md:text-sm">
+                Theo dõi và tra cứu chi tiết giá các loại nông sản tại các tỉnh
+                thành trên cả nước.
+              </p>
+            </div>
+
+            {!isLoading && !isError && allCommodities.length > 0 && (
+              <MarketSummary items={allCommodities} />
+            )}
+          </div>
 
           <DataToolbar
             search={
@@ -342,34 +356,49 @@ export default function CommoditiesPage() {
               </div>
             }
             filters={
-              <div
-                className="flex gap-2 overflow-x-auto pb-1 lg:pb-0"
-                role="group"
-                aria-label="Lọc theo danh mục"
-              >
-                {[
-                  { id: 'all', name: 'Tất cả' },
-                  ...categories.map((category) => ({
-                    id: String(category.id),
-                    name: category.name,
-                  })),
-                ].map((category) => (
-                  <button
-                    key={category.id}
-                    type="button"
-                    aria-pressed={selectedCategory === String(category.id)}
-                    onClick={() => setSelectedCategory(String(category.id))}
-                    className={cn(
-                      'h-9 shrink-0 rounded-lg border px-3 text-sm font-medium transition-colors',
-                      selectedCategory === String(category.id)
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                    )}
-                  >
-                    {category.name}
-                  </button>
-                ))}
-              </div>
+              <>
+                <select
+                  value={selectedCategory}
+                  onChange={(event) => setSelectedCategory(event.target.value)}
+                  className="border-input bg-card h-10 w-full rounded-lg border px-3 text-sm sm:hidden"
+                  aria-label="Lọc theo danh mục"
+                >
+                  <option value="all">Tất cả danh mục</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={String(category.id)}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                <div
+                  className="hidden flex-wrap gap-2 sm:flex"
+                  role="group"
+                  aria-label="Lọc theo danh mục"
+                >
+                  {[
+                    { id: 'all', name: 'Tất cả' },
+                    ...categories.map((category) => ({
+                      id: String(category.id),
+                      name: category.name,
+                    })),
+                  ].map((category) => (
+                    <button
+                      key={category.id}
+                      type="button"
+                      aria-pressed={selectedCategory === String(category.id)}
+                      onClick={() => setSelectedCategory(String(category.id))}
+                      className={cn(
+                        'h-9 rounded-lg border px-3 text-sm font-medium transition-colors',
+                        selectedCategory === String(category.id)
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                      )}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+              </>
             }
             actions={
               <>

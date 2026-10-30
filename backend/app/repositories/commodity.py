@@ -168,22 +168,7 @@ class CommodityRepository:
             .order_by(asc(CommodityPrice.date))
         )
         result = await self.db.execute(query)
-        recent_rows = list(result.scalars().all())
-        distinct_days = {r.date.date() for r in recent_rows if r.date}
-        if len(distinct_days) >= min(days, 5):
-            return recent_rows
-
-        # Fallback: lấy các bản ghi lịch sử gần nhất của mặt hàng này để dựng chuỗi ngày liên tục
-        fallback_q = (
-            select(CommodityPrice)
-            .where(CommodityPrice.commodity_id == commodity_id)
-            .order_by(desc(CommodityPrice.date), desc(CommodityPrice.id))
-            .limit(max(days, 30))
-        )
-        fb_res = await self.db.execute(fallback_q)
-        fb_rows = list(fb_res.scalars().all())
-        fb_rows.reverse()
-        return fb_rows
+        return list(result.scalars().all())
 
     async def get_top_movers(self, limit: int = 10) -> List[dict]:
         """
@@ -253,7 +238,7 @@ class CommodityRepository:
                 "prev_price": prev_price,
                 "change_pct": change_pct,
                 "currency": latest.currency,
-                "updated_at": latest.date,
+                "updated_at": latest.date if latest.date.tzinfo else latest.date.replace(tzinfo=timezone.utc),
             })
 
         # Sắp xếp theo |change_pct| giảm dần

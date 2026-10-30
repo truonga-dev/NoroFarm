@@ -7,7 +7,8 @@ from app.schemas.commodity import (
     CommodityCreate, CommodityUpdate,
     CategoryCreate, CategoryUpdate,
     PriceCreate, BulkPriceCreate, PaginationParams, PaginatedResponse,
-    PriceHistoryPoint, TopMoverResponse, CommodityOverviewResponse
+    PriceHistoryPoint, TopMoverResponse, CommodityOverviewResponse,
+    DomesticPriceItem, WorldDomesticBoardResponse
 )
 from app.repositories.commodity import CommodityRepository
 import math
@@ -153,59 +154,26 @@ class CommodityService:
         return count
 
     async def get_price_history(self, commodity_id: int, days: int = 30) -> List[PriceHistoryPoint]:
-        """Lấy lịch sử giá theo ngày (Có Caching)"""
-        from datetime import datetime, timedelta, timezone
+        """Return only recorded price observations, never inferred chart points."""
+        from datetime import timezone
         from app.core.redis import redis_client
-        cache_key = f"commodity:price_history:v2:{commodity_id}:{days}"
+        cache_key = f"commodity:price_history:v4:{commodity_id}:{days}"
         cached = await redis_client.get(cache_key)
         if cached:
             return [PriceHistoryPoint(**p) for p in cached]
 
-        commodity = await self.get_commodity(commodity_id)  # verify exists
+        await self.get_commodity(commodity_id)  # verify exists
         prices = await self.repo.get_price_history(commodity_id, days)
-
-        # Gom theo ngày và đảm bảo chuỗi ngày liên tục kết thúc ở ngày hiện tại để biểu đồ so sánh đa vùng khớp trục X
-        now_utc = datetime.now(timezone.utc)
-        distinct_prices: List[float] = []
-        last_loc = commodity.location
-        currency = "VND"
-        for p in prices:
-            currency = p.currency or "VND"
-            if p.location:
-                last_loc = p.location
-            if not distinct_prices or distinct_prices[-1] != float(p.price):
-                distinct_prices.append(float(p.price))
-
-        target_len = min(days, 30)
-        if not distinct_prices and commodity.current_price:
-            distinct_prices = [float(commodity.current_price)]
-
-        points: List[dict] = []
-        if distinct_prices:
-            latest_val = distinct_prices[-1]
-            start_val = distinct_prices[0] if len(distinct_prices) > 1 else latest_val * 0.97
-            for i in range(target_len):
-                day_dt = now_utc - timedelta(days=(target_len - 1 - i))
-                if i == target_len - 1:
-                    val = latest_val
-                elif i < len(distinct_prices) - 1:
-                    val = distinct_prices[max(0, len(distinct_prices) - target_len + i)]
-                else:
-                    ratio = i / max(1, target_len - 1)
-                    wave = ((i * 7 + commodity_id * 3) % 5 - 2) * 0.003 * latest_val
-                    val = round(start_val + (latest_val - start_val) * ratio + wave, 2)
-                points.append({
-                    "date": day_dt.isoformat(),
-                    "price": val,
-                    "currency": currency,
-                    "location": last_loc,
-                })
-
-        await redis_client.set(cache_key, points, expire=600)  # 10 phút
+        points = [
+            {"date": (p.date if p.date.tzinfo else p.date.replace(tzinfo=timezone.utc)).isoformat(), "price": float(p.price),
+             "currency": p.currency or "VND", "location": p.location}
+            for p in prices
+        ]
+        await redis_client.set(cache_key, points, expire=15)
         return [PriceHistoryPoint(**p) for p in points]
 
     async def get_top_movers(self, limit: int = 10) -> List[TopMoverResponse]:
-        """Lấy mặt hàng biến động giá mạnh nhất (Có Caching 2 phút)"""
+        """Lấy mặt hàng biến động giá mạnh nhất (cache ngắn cho giao diện tự làm mới)."""
         from app.core.redis import redis_client
         cache_key = f"commodity:top_movers:{limit}"
         cached = await redis_client.get(cache_key)
@@ -213,5 +181,38 @@ class CommodityService:
             return [TopMoverResponse(**m) for m in cached]
 
         movers = await self.repo.get_top_movers(limit)
-        await redis_client.set(cache_key, movers, expire=120) # 2 phút
+        await redis_client.set(cache_key, movers, expire=15)
         return [TopMoverResponse(**m) for m in movers]
+
+    async def get_world_domestic_board(self) -> WorldDomesticBoardResponse:
+        """Return recorded domestic prices; world quotes need a verified provider."""
+        from datetime import datetime, timezone
+
+        commodities, _ = await self.repo.get_commodities(PaginationParams(size=100))
+        domestic_items = []
+        for item in commodities:
+            latest = item._sorted_prices()[0] if item.prices else None
+            if not latest or latest.currency != "VND":
+                continue
+            if any(place in item.name.lower() for place in ("london", "new york", "ice ", "cbot")):
+                continue
+            change = item.price_change
+            domestic_items.append(DomesticPriceItem(
+                code=item.code,
+                name=item.name,
+                location=latest.location or "Chưa rõ khu vực",
+                price_vnd_kg=latest.price,
+                change_vnd=change,
+                change_percent=item.price_change_percent or 0.0,
+                direction="UP" if change > 0 else "DOWN" if change < 0 else "FLAT",
+                updated_at=latest.date.isoformat(),
+            ))
+
+        return WorldDomesticBoardResponse(
+            exchange_rate_usd_vnd=None,
+            exchange_rate_updated=None,
+            world_items=[],
+            domestic_items=domestic_items,
+            basis_spreads=[],
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )

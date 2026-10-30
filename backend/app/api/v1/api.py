@@ -13,7 +13,8 @@ from app.api.v1.endpoints import (
     market,
     test_email,
     shop,
-    contacts
+    contacts,
+    ai_chat
 )
 
 api_router = APIRouter()
@@ -31,3 +32,4 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(shop.router, prefix="/shop", tags=["shop"])
 api_router.include_router(contacts.router, prefix="/contacts", tags=["contacts"])
+api_router.include_router(ai_chat.router, prefix="/ai", tags=["ai-chat"])

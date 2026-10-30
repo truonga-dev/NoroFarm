@@ -135,3 +135,46 @@ class TopMoverResponse(BaseModel):
     change_pct: Optional[float] = None
     currency: str = "VND"
     updated_at: datetime
+
+class WorldPriceItem(BaseModel):
+    code: str
+    name: str
+    exchange: str
+    price_original: float
+    original_unit: str
+    price_vnd_kg: float
+    change_original: float
+    change_percent: float
+    direction: str = "UP"  # "UP", "DOWN", "FLAT"
+    contract_month: Optional[str] = None
+    volume: Optional[str] = None
+    updated_at: str
+
+class DomesticPriceItem(BaseModel):
+    code: str
+    name: str
+    location: str
+    price_vnd_kg: float
+    change_vnd: float
+    change_percent: float
+    direction: str = "UP"
+    updated_at: str
+
+class BasisSpreadItem(BaseModel):
+    pair: str
+    world_name: str
+    domestic_name: str
+    world_vnd_kg: float
+    domestic_vnd_kg: float
+    spread_vnd_kg: float
+    spread_percent: float
+    status: str  # "discount", "premium", "parity"
+    assessment: str
+
+class WorldDomesticBoardResponse(BaseModel):
+    exchange_rate_usd_vnd: Optional[float] = None
+    exchange_rate_updated: Optional[str] = None
+    world_items: List[WorldPriceItem]
+    domestic_items: List[DomesticPriceItem]
+    basis_spreads: List[BasisSpreadItem]
+    timestamp: str

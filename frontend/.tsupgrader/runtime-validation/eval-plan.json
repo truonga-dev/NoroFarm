@@ -1,0 +1,11 @@
+{
+  "projectType": "webapp",
+  "setup": [],
+  "assertions": [
+    { "name": "tsc-no-emit", "kind": "process", "command": "npx", "args": ["tsc", "--noEmit"], "verificationMethod": "exit-code", "expected": "0", "timeoutSeconds": 180 },
+    { "name": "production-build", "kind": "process", "command": "npm", "args": ["run", "build"], "verificationMethod": "exit-code", "expected": "0", "timeoutSeconds": 300 },
+    { "name": "tests-pass", "kind": "process", "command": "npm", "args": ["test"], "verificationMethod": "test-results", "expected": "0", "timeoutSeconds": 180 },
+    { "name": "home-route-responds", "kind": "http-probe", "startCommand": "npm", "startArgs": ["run", "start", "--", "-p", "3100"], "url": "http://localhost:3100/", "verificationMethod": "http-status", "expected": "200", "timeoutSeconds": 90 },
+    { "name": "commodities-route-responds", "kind": "http-probe", "startCommand": "npm", "startArgs": ["run", "start", "--", "-p", "3100"], "url": "http://localhost:3100/commodities", "verificationMethod": "http-status", "expected": "200", "timeoutSeconds": 90 }
+  ]
+}

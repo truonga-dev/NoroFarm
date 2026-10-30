@@ -5,7 +5,8 @@ from app.database.database import get_db
 from app.schemas.commodity import (
     CommodityResponse, CommodityCreate, CommodityUpdate,
     PriceResponse, PriceCreate, BulkPriceCreate, PaginationParams, PaginatedResponse,
-    PriceHistoryPoint, TopMoverResponse, CommodityOverviewResponse
+    PriceHistoryPoint, TopMoverResponse, CommodityOverviewResponse,
+    WorldDomesticBoardResponse
 )
 from app.services.commodity import CommodityService
 from app.common.response import ResponseModel, success_response
@@ -44,6 +45,13 @@ async def get_top_movers(
 async def get_commodity_overview(db: AsyncSession = Depends(get_db)):
     service = CommodityService(db)
     return success_response(data=await service.get_overview())
+
+@router.get("/world-domestic-board", response_model=ResponseModel[WorldDomesticBoardResponse])
+async def get_world_domestic_board(db: AsyncSession = Depends(get_db)):
+    """Giá nội địa đã ghi nhận; dữ liệu quốc tế chỉ có khi tích hợp nguồn xác thực."""
+    service = CommodityService(db)
+    board = await service.get_world_domestic_board()
+    return success_response(data=board, message="Giá thị trường đã ghi nhận")
 
 @router.get("/realtime", response_model=ResponseModel[List[TopMoverResponse]])
 async def get_realtime_prices_2026(

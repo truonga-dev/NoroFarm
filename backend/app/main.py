@@ -32,8 +32,8 @@ async def lifespan(app: FastAPI):
     logger.info("Khởi động ứng dụng NoroFarm Backend")
     # Connect Redis
     await redis_client.connect()
-    # Thêm tác vụ tự động cào tất cả giá nông sản mỗi 1 tiếng (3600s)
-    await scheduler.add_task("fetch_all_commodity_prices", run_all_crawlers, 3600)
+    # Kiểm tra nguồn giá có thể xác thực mỗi 5 phút; giao diện tự làm mới nhanh hơn.
+    await scheduler.add_task("fetch_all_commodity_prices", run_all_crawlers, 300)
     # Thêm tác vụ đồng bộ thời tiết từ OpenWeather mỗi 12 tiếng (43200s)
     await scheduler.add_task("sync_weather_data", run_weather_sync, 43200)
     # Khởi động Scheduler

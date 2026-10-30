@@ -2,729 +2,426 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useQueries, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
-  BarChart3,
-  Check,
   Download,
-  GitCompare,
   RefreshCw,
 } from 'lucide-react'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
 
 import { coffeeService } from '@/api/services/coffee.service'
 import { commoditiesService } from '@/api/services/commodities.service'
+import { MarketLineChart } from '@/components/commodities/market-line-chart'
 import { DataState } from '@/components/data-display/data-state'
 import { Container } from '@/components/layout/container'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-interface PricePoint {
-  date: string
-  price: number
-}
 interface CoffeeItem {
   id: number
   name: string
   code?: string
-  current_price?: number
-  price_change?: number
-  price_change_percent?: number
-  updated_at?: string
-  prices?: PricePoint[]
+  current_price?: number | null
+  price_change?: number | null
+  price_change_percent?: number | null
+  updated_at?: string | null
 }
 
-const COMPARE_COLORS = ['#28704a', '#9a642b', '#5d7188', '#855f72']
-const PERIODS = [7, 14, 30]
-const formatPrice = (value?: number | null) =>
-  typeof value === 'number' && value > 0
-    ? Math.round(value).toLocaleString('vi-VN')
+interface PricePoint {
+  date: string
+  price: number
+}
+
+const PERIODS = [
+  { label: '24 giờ', value: 1 },
+  { label: '7 ngày', value: 7 },
+  { label: '30 ngày', value: 30 },
+  { label: '90 ngày', value: 90 },
+]
+const DOMESTIC_COFFEE_CODES = new Set([
+  'coffee_dak_lak',
+  'coffee_lam_dong',
+  'coffee_gia_lai',
+  'coffee_dak_nông',
+  'coffee_kon_tum',
+])
+const formatPrice = (price?: number | null) =>
+  typeof price === 'number' && Number.isFinite(price)
+    ? Math.round(price).toLocaleString('vi-VN')
     : '—'
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="border-border bg-popover min-w-36 rounded-lg border px-3 py-2 shadow-md">
-      <p className="text-muted-foreground border-border mb-1.5 border-b pb-1.5 text-xs">
-        {label}
-      </p>
-      <div className="space-y-1.5">
-        {payload.map((entry: any) => (
-          <div
-            key={entry.dataKey}
-            className="flex items-center justify-between gap-4 text-xs"
-          >
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{
-                  backgroundColor: entry.color || 'hsl(var(--primary))',
-                }}
-              />
-              {entry.name === 'price' ? 'Giá' : entry.name}
-            </span>
-            <strong className="tabular-nums">
-              {formatPrice(Number(entry.value))} đ
-            </strong>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+const regionName = (name: string) => name.replace(/^Cà phê\s+/i, '')
 
 export default function CoffeePage() {
   const [selectedId, setSelectedId] = React.useState<number | null>(null)
-  const [days, setDays] = React.useState(7)
-  const [isCompareMode, setIsCompareMode] = React.useState(false)
-  const [compareIds, setCompareIds] = React.useState<number[]>([])
-  const [isSyncing, setIsSyncing] = React.useState(false)
-
+  const [days, setDays] = React.useState(30)
   const coffeeQuery = useQuery({
     queryKey: ['coffee-data'],
-    queryFn: () => coffeeService.getCoffeeData(),
+    queryFn: () => coffeeService.getCoffeeData({ size: 100 }),
+    refetchInterval: 15_000,
   })
-  const coffeePrices: CoffeeItem[] = React.useMemo(
-    () => coffeeQuery.data?.data?.items || [],
-    [coffeeQuery.data]
+  const items: CoffeeItem[] = (coffeeQuery.data?.data?.items || []).filter(
+    (item: CoffeeItem) => DOMESTIC_COFFEE_CODES.has(item.code || '')
   )
-  const activeCoffee =
-    coffeePrices.find((item) => item.id === selectedId) || coffeePrices[0]
-  const activeCoffeeId = activeCoffee?.id
-  const effectiveCompareIds = React.useMemo(
-    () =>
-      compareIds.length
-        ? compareIds
-        : coffeePrices.slice(0, 3).map((item) => item.id),
-    [compareIds, coffeePrices]
-  )
-
+  const selected = items.find((item) => item.id === selectedId) || items[0]
   const historyQuery = useQuery({
-    queryKey: ['coffee-history', activeCoffeeId, days],
-    queryFn: async () =>
-      (await commoditiesService.getPriceHistory(activeCoffeeId!, days)).data,
-    enabled: Boolean(activeCoffeeId) && !isCompareMode,
+    queryKey: ['coffee-history', selected?.id, Math.max(days, 7)],
+    queryFn: () =>
+      commoditiesService.getPriceHistory(selected.id, Math.max(days, 7)),
+    enabled: Boolean(selected?.id),
+    refetchInterval: 15_000,
   })
-  const compareQueries = useQueries({
-    queries: (isCompareMode ? effectiveCompareIds : []).map((id) => ({
-      queryKey: ['coffee-compare-history', id, days],
-      queryFn: async () => {
-        const response = await commoditiesService.getPriceHistory(id, days)
-        const value = response.data?.data || response.data || []
-        return { id, items: Array.isArray(value) ? value : [] }
-      },
-    })),
-  })
+  const history: PricePoint[] = Array.isArray(historyQuery.data?.data)
+    ? historyQuery.data.data
+    : []
+  const chartData = history
+    .filter(
+      (point) =>
+        Number.isFinite(Number(point.price)) &&
+        Number.isFinite(new Date(point.date).getTime())
+    )
+    .map((point) => ({
+      date: point.date,
+      timestamp: new Date(point.date).getTime(),
+      price: Number(point.price),
+    }))
+    .filter(
+      (point) =>
+        days !== 1 || point.timestamp >= Date.now() - 24 * 60 * 60 * 1000
+    )
+    .sort((a, b) => a.timestamp - b.timestamp)
 
-  const rawHistory = historyQuery.data?.data || historyQuery.data || []
-  const history: PricePoint[] =
-    Array.isArray(rawHistory) && rawHistory.length
-      ? rawHistory
-      : [...(activeCoffee?.prices || [])].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-        )
-  const chartData = history.map((point) => ({
-    date: new Date(point.date).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-    }),
-    price: Math.round(Number(point.price)),
-  }))
-
-  const compareChartData = React.useMemo(() => {
-    if (!isCompareMode) return []
-    const dates = new Map<string, Record<string, string | number>>()
-    effectiveCompareIds.forEach((id, index) => {
-      const item = coffeePrices.find((coffee) => coffee.id === id)
-      if (!item) return
-      const queryValue = compareQueries[index]?.data
-      const points: PricePoint[] = queryValue?.items?.length
-        ? queryValue.items
-        : item.prices || []
-      points.forEach((point) => {
-        const date = new Date(point.date).toLocaleDateString('vi-VN', {
-          day: '2-digit',
-          month: '2-digit',
-        })
-        const row = dates.get(date) || { date }
-        row[item.name] = Math.round(Number(point.price))
-        dates.set(date, row)
-      })
-    })
-    return Array.from(dates.values())
-  }, [coffeePrices, compareQueries, effectiveCompareIds, isCompareMode])
-
-  const validPrices = coffeePrices
-    .map((item) => item.current_price ?? item.prices?.[0]?.price)
-    .filter((price): price is number => typeof price === 'number' && price > 0)
-  const avgPrice = validPrices.length
-    ? validPrices.reduce((sum, price) => sum + price, 0) / validPrices.length
+  const firstPrice = chartData[0]?.price
+  const lastPrice = chartData.at(-1)?.price
+  const chartChange =
+    firstPrice && lastPrice !== undefined
+      ? ((lastPrice - firstPrice) / firstPrice) * 100
+      : null
+  const chartLow = chartData.length
+    ? Math.min(...chartData.map((point) => point.price))
     : null
-  const maxPrice = validPrices.length ? Math.max(...validPrices) : null
-  const minPrice = validPrices.length ? Math.min(...validPrices) : null
-  const highestItem = coffeePrices.find(
-    (item) => (item.current_price ?? item.prices?.[0]?.price) === maxPrice
-  )
-  const lastUpdated = coffeePrices
-    .map((item) => item.prices?.[0]?.date || item.updated_at)
-    .filter(Boolean)
-    .map((date) => new Date(date!).getTime())
-    .filter(Number.isFinite)
-    .sort((a, b) => b - a)[0]
-
-  const toggleCompareId = (id: number) => {
-    const current = compareIds.length ? compareIds : effectiveCompareIds
-    if (current.includes(id)) {
-      if (current.length > 1)
-        setCompareIds(current.filter((value) => value !== id))
-    } else if (current.length < 4) {
-      setCompareIds([...current, id])
-    }
-  }
-
-  const syncPrices = async () => {
-    setIsSyncing(true)
-    try {
-      await commoditiesService.crawlLive()
-      await coffeeQuery.refetch()
-      if (activeCoffeeId) await historyQuery.refetch()
-    } finally {
-      setIsSyncing(false)
-    }
-  }
+  const chartHigh = chartData.length
+    ? Math.max(...chartData.map((point) => point.price))
+    : null
+  const recordedAt = chartData.at(-1)?.date || selected?.updated_at
+  const stale = recordedAt
+    ? Date.now() - new Date(recordedAt).getTime() > 30 * 60 * 1000
+    : true
 
   const exportCsv = () => {
-    if (!coffeePrices.length) return
-    const rows = coffeePrices.map((item) => {
-      const price = Math.round(
-        item.current_price ?? item.prices?.[0]?.price ?? 0
-      )
-      const change = Math.round(item.price_change ?? 0)
-      const date = item.prices?.[0]?.date || item.updated_at || ''
-      return [
-        `"${item.name.replace(/"/g, '""')}"`,
-        `"${item.code || ''}"`,
-        price,
-        change,
-        item.price_change_percent ?? 0,
-        `"${date ? new Date(date).toLocaleDateString('vi-VN') : ''}"`,
-      ].join(',')
-    })
+    if (!items.length) return
     const csv =
       '\uFEFF' +
       [
         'KhuVuc,Ma,Gia_VND_kg,ThayDoi_VND,ThayDoi_PhanTram,CapNhat',
-        ...rows,
+        ...items.map((item) =>
+          [
+            `"${item.name.replace(/"/g, '""')}"`,
+            `"${item.code || ''}"`,
+            item.current_price ?? '',
+            item.price_change ?? '',
+            item.price_change_percent ?? '',
+            item.updated_at || '',
+          ].join(',')
+        ),
       ].join('\n')
     const url = URL.createObjectURL(
       new Blob([csv], { type: 'text/csv;charset=utf-8' })
     )
     const link = document.createElement('a')
     link.href = url
-    link.download = 'bang-gia-ca-phe.csv'
+    link.download = 'gia-ca-phe.csv'
     link.click()
     URL.revokeObjectURL(url)
   }
 
   return (
-    <main className="pb-16 md:pb-20">
+    <main className="pb-16">
       <div className="border-border bg-card border-b">
-        <Container className="py-7 md:py-10">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div>
-              <p className="text-primary text-sm font-semibold">
-                Dữ liệu chuyên ngành
-              </p>
-              <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] md:text-5xl">
-                Giá cà phê
-              </h1>
-              <p className="text-muted-foreground mt-3 max-w-2xl leading-7">
-                Theo dõi giá cà phê tại các tỉnh Tây Nguyên và thị trường quốc
-                tế.
-              </p>
-              {lastUpdated && (
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Cập nhật gần nhất:{' '}
-                  {new Date(lastUpdated).toLocaleString('vi-VN', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    day: '2-digit',
-                    month: '2-digit',
-                  })}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                onClick={exportCsv}
-                disabled={!coffeePrices.length}
-              >
-                <Download className="h-4 w-4" />
-                Xuất CSV
-              </Button>
-              <Button onClick={syncPrices} disabled={isSyncing}>
-                <RefreshCw
-                  className={cn('h-4 w-4', isSyncing && 'animate-spin')}
-                />
-                {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ giá'}
-              </Button>
-            </div>
+        <Container className="flex flex-wrap items-center justify-between gap-3 py-4">
+          <div>
+            <p className="text-primary text-xs font-semibold tracking-[0.14em] uppercase">
+              Thị trường nông sản
+            </p>
+            <h1 className="mt-0.5 text-2xl font-bold tracking-tight md:text-3xl">
+              Giá cà phê Việt Nam
+            </h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground hidden text-xs sm:block">
+              Giá tham khảo · tự kiểm tra mỗi 15 giây
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportCsv}
+              disabled={!items.length}
+            >
+              <Download className="h-4 w-4" /> Xuất CSV
+            </Button>
           </div>
         </Container>
       </div>
 
-      <Container className="py-7 md:py-10">
+      <Container className="space-y-5 py-4">
         {coffeeQuery.isLoading ? (
-          <div className="space-y-5">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-96 w-full" />
-          </div>
+          <Skeleton className="h-[560px] w-full" />
         ) : coffeeQuery.isError ? (
           <DataState
             title="Không thể tải giá cà phê"
-            description="Dữ liệu có thể đang được cập nhật. Vui lòng thử lại."
+            description="Vui lòng kiểm tra kết nối rồi thử lại."
             action={
               <Button onClick={() => coffeeQuery.refetch()}>Thử lại</Button>
             }
           />
-        ) : !coffeePrices.length ? (
-          <DataState
-            icon={<BarChart3 className="h-5 w-5" />}
-            title="Chưa có dữ liệu cà phê"
-            description="Các khu vực và mức giá sẽ xuất hiện tại đây sau lần cập nhật tiếp theo."
-          />
+        ) : !items.length ? (
+          <DataState title="Chưa có dữ liệu giá cà phê" />
         ) : (
-          <div className="space-y-7">
-            <section className="border-border bg-card grid rounded-xl border sm:grid-cols-2 lg:grid-cols-4">
-              {[
-                ['Giá trung bình', avgPrice],
-                ['Mức cao nhất', maxPrice],
-                ['Mức thấp nhất', minPrice],
-                [
-                  'Biên độ',
-                  maxPrice !== null && minPrice !== null
-                    ? maxPrice - minPrice
-                    : null,
-                ],
-              ].map(([label, value], index) => (
-                <div
-                  key={String(label)}
-                  className={cn(
-                    'px-5 py-4',
-                    index > 0 &&
-                      'border-border border-t sm:border-t-0 sm:border-l',
-                    index === 2 && 'sm:border-l-0 lg:border-l'
-                  )}
-                >
-                  <p className="text-muted-foreground text-xs font-medium">
-                    {label}
-                  </p>
-                  <p className="mt-1 text-xl font-bold tabular-nums">
-                    {formatPrice(value as number | null)}{' '}
-                    <span className="text-muted-foreground text-xs font-medium">
-                      đ/kg
-                    </span>
-                  </p>
-                </div>
-              ))}
-            </section>
-
+          <>
             <section className="border-border bg-card overflow-hidden rounded-xl border">
-              <div className="border-border space-y-4 border-b px-5 py-4 md:px-6">
-                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                  <div>
-                    <h2 className="font-semibold">
-                      {isCompareMode
-                        ? 'So sánh giá theo vùng'
-                        : activeCoffee?.name}
-                    </h2>
-                    <p className="text-muted-foreground mt-0.5 text-sm">
-                      {isCompareMode
-                        ? `Đang hiển thị ${effectiveCompareIds.length} khu vực`
-                        : `Diễn biến trong ${days} ngày gần đây`}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant={isCompareMode ? 'default' : 'outline'}
-                      onClick={() => setIsCompareMode((value) => !value)}
-                    >
-                      <GitCompare className="h-4 w-4" />
-                      {isCompareMode ? 'Đang so sánh' : 'So sánh vùng'}
-                    </Button>
-                    <div className="bg-muted flex rounded-lg p-1">
-                      {PERIODS.map((period) => (
-                        <button
-                          key={period}
-                          onClick={() => setDays(period)}
-                          className={cn(
-                            'rounded-md px-3 py-1.5 text-xs font-semibold',
-                            days === period
-                              ? 'bg-background shadow-sm'
-                              : 'text-muted-foreground'
-                          )}
-                        >
-                          {period} ngày
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {isCompareMode && (
-                  <div
-                    className="border-border flex gap-2 overflow-x-auto border-t pt-4"
-                    aria-label="Chọn khu vực so sánh"
-                  >
-                    {coffeePrices.map((item) => {
-                      const index = effectiveCompareIds.indexOf(item.id)
-                      const selected = index >= 0
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => toggleCompareId(item.id)}
-                          className={cn(
-                            'border-border flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium',
-                            selected
-                              ? 'border-primary bg-primary/5 text-foreground'
-                              : 'text-muted-foreground hover:bg-muted'
-                          )}
-                        >
-                          {selected && (
-                            <span
-                              className="h-2 w-2 rounded-full"
-                              style={{
-                                backgroundColor:
-                                  COMPARE_COLORS[index % COMPARE_COLORS.length],
-                              }}
-                            />
-                          )}
-                          {item.name}
-                          {selected && <Check className="h-3 w-3" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-              <div className="h-[330px] px-2 py-5 sm:px-4 md:px-5">
-                {isCompareMode ? (
-                  compareQueries.some((query) => query.isLoading) ? (
-                    <Skeleton className="h-full w-full" />
-                  ) : !compareChartData.length ? (
-                    <DataState
-                      className="h-full min-h-0 border-0"
-                      title="Chưa có dữ liệu so sánh"
-                    />
-                  ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={compareChartData}
-                        margin={{ top: 8, right: 8, left: 0, bottom: 10 }}
-                      >
-                        <CartesianGrid
-                          stroke="hsl(var(--border))"
-                          strokeDasharray="3 3"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="date"
-                          axisLine={false}
-                          tickLine={false}
-                          minTickGap={24}
-                          tick={{
-                            fill: 'hsl(var(--muted-foreground))',
-                            fontSize: 11,
-                          }}
-                        />
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          width={42}
-                          domain={['auto', 'auto']}
-                          tickFormatter={(value) =>
-                            `${Math.round(value / 1000)}k`
-                          }
-                          tick={{
-                            fill: 'hsl(var(--muted-foreground))',
-                            fontSize: 11,
-                          }}
-                        />
-                        <Tooltip content={<ChartTooltip />} />
-                        <Legend
-                          wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
-                        />
-                        {effectiveCompareIds.map((id, index) => {
-                          const item = coffeePrices.find(
-                            (coffee) => coffee.id === id
-                          )
-                          return item ? (
-                            <Line
-                              key={id}
-                              type="monotone"
-                              dataKey={item.name}
-                              stroke={
-                                COMPARE_COLORS[index % COMPARE_COLORS.length]
-                              }
-                              strokeWidth={2}
-                              dot={false}
-                              activeDot={{ r: 4 }}
-                            />
-                          ) : null
-                        })}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )
-                ) : historyQuery.isLoading ? (
-                  <Skeleton className="h-full w-full" />
-                ) : !chartData.length ? (
-                  <DataState
-                    className="h-full min-h-0 border-0"
-                    title="Chưa có lịch sử giá"
-                  />
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={chartData}
-                      margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                    >
-                      <defs>
-                        <linearGradient
-                          id="coffeePriceFill"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="0%"
-                            stopColor="hsl(var(--primary))"
-                            stopOpacity={0.2}
-                          />
-                          <stop
-                            offset="100%"
-                            stopColor="hsl(var(--primary))"
-                            stopOpacity={0}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        stroke="hsl(var(--border))"
-                        strokeDasharray="3 3"
-                        vertical={false}
-                      />
-                      <XAxis
-                        dataKey="date"
-                        axisLine={false}
-                        tickLine={false}
-                        minTickGap={24}
-                        tick={{
-                          fill: 'hsl(var(--muted-foreground))',
-                          fontSize: 11,
-                        }}
-                      />
-                      <YAxis
-                        axisLine={false}
-                        tickLine={false}
-                        width={42}
-                        domain={['auto', 'auto']}
-                        tickFormatter={(value) =>
-                          `${Math.round(value / 1000)}k`
-                        }
-                        tick={{
-                          fill: 'hsl(var(--muted-foreground))',
-                          fontSize: 11,
-                        }}
-                      />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Area
-                        type="monotone"
-                        dataKey="price"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        fill="url(#coffeePriceFill)"
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </section>
-
-            <section className="border-border bg-card overflow-hidden rounded-xl border">
-              <div className="border-border flex items-center justify-between border-b px-5 py-4 md:px-6">
-                <div>
-                  <h2 className="font-semibold">Bảng giá theo khu vực</h2>
-                  <p className="text-muted-foreground mt-0.5 text-sm">
-                    {coffeePrices.length} khu vực và sàn giao dịch
-                  </p>
-                </div>
-                {highestItem && (
-                  <p className="text-muted-foreground hidden text-xs md:block">
-                    Cao nhất:{' '}
-                    <strong className="text-foreground">
-                      {highestItem.name}
-                    </strong>
-                  </p>
-                )}
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/60 text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-3 text-left font-medium">
-                        Khu vực / Sàn
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
-                        Giá hiện tại
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
-                        Thay đổi
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
-                        Cập nhật
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
-                        <span className="sr-only">Chi tiết</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-border divide-y">
-                    {coffeePrices.map((item) => {
-                      const price =
-                        item.current_price ?? item.prices?.[0]?.price
-                      const change = item.price_change ?? 0
-                      const percent = item.price_change_percent ?? 0
-                      const updatedAt =
-                        item.prices?.[0]?.date || item.updated_at
-                      return (
-                        <tr
-                          key={item.id}
-                          onClick={() => {
-                            setSelectedId(item.id)
-                            setIsCompareMode(false)
-                          }}
-                          className={cn(
-                            'hover:bg-muted/30 cursor-pointer',
-                            !isCompareMode &&
-                              activeCoffee?.id === item.id &&
-                              'bg-primary/5'
-                          )}
-                        >
-                          <td className="px-5 py-3.5">
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-muted-foreground mt-0.5 text-xs">
-                              {item.code}
-                            </p>
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-semibold tabular-nums">
-                            {formatPrice(price)} đ/kg
-                          </td>
-                          <td
-                            className={cn(
-                              'px-5 py-3.5 text-right font-medium tabular-nums',
-                              change > 0
-                                ? 'text-emerald-700 dark:text-emerald-400'
-                                : change < 0
-                                  ? 'text-red-700 dark:text-red-400'
-                                  : 'text-muted-foreground'
-                            )}
-                          >
-                            {change > 0 ? '+' : ''}
-                            {Number(percent).toFixed(2)}%
-                          </td>
-                          <td className="text-muted-foreground px-5 py-3.5 text-right">
-                            {updatedAt
-                              ? new Date(updatedAt).toLocaleDateString('vi-VN')
-                              : '—'}
-                          </td>
-                          <td
-                            className="px-5 py-3.5 text-right"
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Link
-                              href={`/commodities/${item.id}`}
-                              className="text-primary inline-flex items-center gap-1 text-xs font-semibold hover:underline"
-                            >
-                              Chi tiết
-                              <ArrowRight className="h-3.5 w-3.5" />
-                            </Link>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="divide-border divide-y md:hidden">
-                {coffeePrices.map((item) => {
-                  const price = item.current_price ?? item.prices?.[0]?.price
-                  const change = item.price_change ?? 0
-                  const percent = item.price_change_percent ?? 0
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setSelectedId(item.id)
-                        setIsCompareMode(false)
-                      }}
+              <div className="border-border flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b px-4 py-3 sm:px-6">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h2 className="text-lg font-semibold">{selected.name}</h2>
+                    <span
                       className={cn(
-                        'flex w-full items-center justify-between gap-4 px-4 py-4 text-left',
-                        activeCoffee?.id === item.id &&
-                          !isCompareMode &&
-                          'bg-primary/5'
+                        'text-xs font-medium',
+                        stale
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-emerald-700 dark:text-emerald-300'
                       )}
                     >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{item.name}</p>
-                        <p
+                      {stale ? 'Dữ liệu chưa mới' : 'Dữ liệu mới ghi nhận'}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <strong className="text-3xl font-bold tracking-tight tabular-nums">
+                      {formatPrice(lastPrice ?? selected.current_price)}{' '}
+                      <span className="text-muted-foreground text-sm font-normal">
+                        đ/kg
+                      </span>
+                    </strong>
+                    {chartChange !== null && (
+                      <span
+                        className={cn(
+                          'inline-flex items-center text-sm font-semibold tabular-nums',
+                          chartChange > 0
+                            ? 'text-emerald-700 dark:text-emerald-300'
+                            : chartChange < 0
+                              ? 'text-red-700 dark:text-red-300'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {chartChange > 0 ? (
+                          <ArrowUpRight className="h-4 w-4" />
+                        ) : chartChange < 0 ? (
+                          <ArrowDownRight className="h-4 w-4" />
+                        ) : null}
+                        {chartChange > 0 ? '+' : ''}
+                        {chartChange.toFixed(2)}% trong kỳ
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <span>
+                    {recordedAt
+                      ? `Giá ghi nhận ${new Date(recordedAt).toLocaleString('vi-VN')}`
+                      : 'Chưa rõ thời điểm ghi nhận'}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      coffeeQuery.refetch()
+                      historyQuery.refetch()
+                    }}
+                    aria-label="Làm mới dữ liệu giá"
+                  >
+                    <RefreshCw
+                      className={cn(
+                        'h-4 w-4',
+                        (coffeeQuery.isFetching || historyQuery.isFetching) &&
+                          'animate-spin'
+                      )}
+                    />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-border flex flex-wrap items-center justify-between gap-3 border-b px-4 py-2 sm:px-6">
+                <div className="flex flex-wrap gap-1" aria-label="Chọn khu vực">
+                  {items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedId(item.id)}
+                      aria-pressed={selected.id === item.id}
+                      className={cn(
+                        'rounded-md px-2.5 py-1.5 text-sm transition-colors',
+                        selected.id === item.id
+                          ? 'bg-primary text-primary-foreground font-semibold'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )}
+                    >
+                      {regionName(item.name)}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="bg-muted flex gap-0.5 rounded-md p-0.5"
+                  aria-label="Khoảng thời gian"
+                >
+                  {PERIODS.map((period) => (
+                    <button
+                      key={period.value}
+                      type="button"
+                      onClick={() => setDays(period.value)}
+                      aria-pressed={days === period.value}
+                      className={cn(
+                        'rounded px-2.5 py-1 text-xs font-medium whitespace-nowrap',
+                        days === period.value
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      {period.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-[#111b16] px-3 pt-3 pb-4 text-[#eaf3ec] sm:px-5">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-[#b2c2b6]">
+                  <span>
+                    Diễn biến thực tế ·{' '}
+                    <span className="text-[#56d99a]">Tăng</span> /{' '}
+                    <span className="text-[#fb817e]">Giảm</span> /{' '}
+                    <span className="text-[#a9b9ae]">Không đổi</span>
+                  </span>
+                  <span>{chartData.length} mốc ghi nhận</span>
+                </div>
+                {historyQuery.isLoading ? (
+                  <Skeleton className="h-[340px] w-full" />
+                ) : historyQuery.isError ? (
+                  <DataState
+                    className="border-0"
+                    title="Không thể tải lịch sử giá"
+                    action={
+                      <Button
+                        variant="outline"
+                        onClick={() => historyQuery.refetch()}
+                      >
+                        Thử lại
+                      </Button>
+                    }
+                  />
+                ) : !chartData.length ? (
+                  <div className="flex h-[340px] items-center justify-center text-center text-sm text-[#b2c2b6]">
+                    Chưa có mốc giá trong khoảng này. Hãy chọn 7 hoặc 30 ngày.
+                  </div>
+                ) : (
+                  <MarketLineChart
+                    points={chartData}
+                    label={`Diễn biến giá ${selected.name}`}
+                    intraday={days === 1}
+                  />
+                )}
+                <p className="mt-2 px-1 text-xs text-[#a9b9ae]">
+                  Đồ thị nối các lần ghi nhận, không phải giá giao dịch từng
+                  giây. Lịch sử cũ có thể chứa dữ liệu mẫu, cần đối soát nguồn.
+                </p>
+              </div>
+
+              <div className="divide-border grid grid-cols-2 divide-x divide-y sm:grid-cols-4 sm:divide-y-0">
+                <div className="px-4 py-3">
+                  <p className="text-muted-foreground text-xs">Đầu kỳ</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {formatPrice(firstPrice)} đ/kg
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-muted-foreground text-xs">Cuối kỳ</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {formatPrice(lastPrice)} đ/kg
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-muted-foreground text-xs">Thấp nhất</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {formatPrice(chartLow)} đ/kg
+                  </p>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="text-muted-foreground text-xs">Cao nhất</p>
+                  <p className="mt-1 font-semibold tabular-nums">
+                    {formatPrice(chartHigh)} đ/kg
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="border-border bg-card overflow-hidden rounded-xl border">
+              <div className="border-border flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-3">
+                <h2 className="font-semibold">Giá theo khu vực</h2>
+                <span className="text-muted-foreground text-xs">
+                  Chọn một khu vực để xem chi tiết
+                </span>
+              </div>
+              <div className="divide-border divide-y">
+                {items.map((item) => {
+                  const change = Number(item.price_change_percent ?? 0)
+                  return (
+                    <div
+                      key={item.id}
+                      className={cn(
+                        'flex flex-wrap items-center justify-between gap-3 px-5 py-3',
+                        item.id === selected.id && 'bg-primary/5'
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(item.id)}
+                        className="min-w-0 text-left font-medium hover:underline"
+                      >
+                        {item.name}
+                      </button>
+                      <div className="flex items-center gap-4 sm:gap-7">
+                        <span className="font-semibold tabular-nums">
+                          {formatPrice(item.current_price)}{' '}
+                          <span className="text-muted-foreground text-xs font-normal">
+                            đ/kg
+                          </span>
+                        </span>
+                        <span
                           className={cn(
-                            'mt-1 flex items-center gap-1 text-xs font-medium',
+                            'w-20 text-right text-sm font-medium tabular-nums',
                             change > 0
-                              ? 'text-emerald-700'
+                              ? 'text-emerald-700 dark:text-emerald-300'
                               : change < 0
-                                ? 'text-red-700'
+                                ? 'text-red-700 dark:text-red-300'
                                 : 'text-muted-foreground'
                           )}
                         >
-                          {change > 0 ? (
-                            <ArrowUpRight className="h-3.5 w-3.5" />
-                          ) : change < 0 ? (
-                            <ArrowDownRight className="h-3.5 w-3.5" />
-                          ) : null}
                           {change > 0 ? '+' : ''}
-                          {Number(percent).toFixed(2)}%
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-right font-semibold tabular-nums">
-                        {formatPrice(price)} đ
-                        <span className="text-muted-foreground block text-xs font-normal">
-                          mỗi kg
+                          {change.toFixed(2)}%
                         </span>
-                      </p>
-                    </button>
+                        <Link
+                          href={`/commodities/${item.id}`}
+                          aria-label={`Chi tiết ${item.name}`}
+                          className="text-primary"
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
             </section>
-          </div>
+          </>
         )}
       </Container>
     </main>

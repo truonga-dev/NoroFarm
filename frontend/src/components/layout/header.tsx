@@ -259,24 +259,24 @@ export function Header() {
 
   return (
     <header className="border-border bg-background/95 sticky top-0 z-40 w-full border-b backdrop-blur-md">
-      <Container>
-        <div className="flex h-16 items-center justify-between gap-4">
+      <Container className="px-3 sm:px-5 md:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-1.5 sm:gap-4">
           {/* Left: Brand & Primary Navigation */}
-          <div className="flex min-w-0 items-center gap-5 xl:gap-7">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-4 lg:gap-5 xl:gap-7">
             <MobileNav />
             <Link
               href="/"
-              className="group flex shrink-0 items-center gap-2.5 focus:outline-none"
+              className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5 focus:outline-none"
               aria-label="NoroFarm - Trang chủ"
             >
               <Image
                 src="/logo.png"
                 alt="NoroFarm"
-                width={36}
-                height={36}
-                className="ring-border rounded-full ring-1"
+                width={32}
+                height={32}
+                className="ring-border rounded-full ring-1 sm:h-9 sm:w-9"
               />
-              <span className="text-foreground text-lg font-bold tracking-[-0.02em] whitespace-nowrap">
+              <span className="text-foreground text-base sm:text-lg font-bold tracking-[-0.02em] whitespace-nowrap">
                 NoroFarm
               </span>
             </Link>
@@ -318,7 +318,7 @@ export function Header() {
           </div>
 
           {/* Right: Search, Cart, Notifications, Theme & Account */}
-          <div className="flex shrink-0 items-center justify-end gap-2">
+          <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
             <div className="hidden w-52 xl:block 2xl:w-60">
               <SearchBar />
             </div>
@@ -337,7 +337,7 @@ export function Header() {
               variant="ghost"
               size="icon"
               asChild
-              className="text-muted-foreground hover:text-foreground relative rounded-full"
+              className="text-muted-foreground hover:text-foreground relative h-8 w-8 sm:h-9 sm:w-9 rounded-full"
             >
               <Link
                 href={
@@ -357,18 +357,18 @@ export function Header() {
             </Button>
 
             {isAuthenticated && user && <NotificationBell />}
-            <ThemeToggle />
+            <ThemeToggle className="h-8 w-8 sm:h-9 sm:w-9" />
 
-            <div className="bg-border mx-1 hidden h-5 w-px sm:block" />
+            <div className="bg-border mx-0.5 sm:mx-1 hidden h-5 w-px sm:block" />
 
             {isAuthenticated && user ? (
               <div className="relative" ref={userMenuRef}>
                 <button
                   type="button"
                   onClick={() => setShowUserMenu((value) => !value)}
-                  className="border-border/80 bg-card/80 hover:border-primary/40 hover:bg-muted/50 flex items-center gap-2 rounded-full border p-1 pr-3 text-sm font-medium shadow-sm transition-all"
+                  className="border-border/80 bg-card/80 hover:border-primary/40 hover:bg-muted/50 flex items-center gap-1.5 sm:gap-2 rounded-full border p-0.5 sm:p-1 pr-2 sm:pr-3 text-sm font-medium shadow-sm transition-all"
                 >
-                  <span className="bg-primary/15 text-primary flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold">
+                  <span className="bg-primary/15 text-primary flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-full text-xs font-bold">
                     {userInitial}
                   </span>
                   <span className="text-foreground hidden max-w-[110px] truncate text-xs font-semibold md:inline">
@@ -468,10 +468,11 @@ export function Header() {
               <Button
                 size="sm"
                 asChild
-                className="rounded-full px-4 font-semibold shadow-sm"
+                className="h-8 sm:h-9 rounded-full px-2.5 sm:px-4 text-xs sm:text-sm font-semibold shadow-sm"
               >
                 <Link href="/login">
-                  <User className="mr-1.5 h-3.5 w-3.5" /> Đăng nhập
+                  <User className="mr-1 sm:mr-1.5 h-3.5 w-3.5" />
+                  <span>Đăng nhập</span>
                 </Link>
               </Button>
             )}

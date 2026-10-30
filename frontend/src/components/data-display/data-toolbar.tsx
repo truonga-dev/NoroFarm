@@ -25,12 +25,14 @@ export function DataToolbar({
       )}
       {...props}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        {search && <div className="w-full lg:max-w-sm">{search}</div>}
-        {filters && <div className="min-w-0 flex-1">{filters}</div>}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        {search && <div className="min-w-0 md:max-w-lg">{search}</div>}
         {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="flex min-w-0 items-center gap-2 md:col-start-2 md:row-start-1 md:justify-end">
+            {actions}
+          </div>
         )}
+        {filters && <div className="min-w-0 md:col-span-2">{filters}</div>}
       </div>
       {footer && (
         <div className="border-border/70 mt-3 border-t pt-3">{footer}</div>

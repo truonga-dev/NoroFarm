@@ -49,6 +49,10 @@ export const commoditiesService = {
     return apiClient.get('/commodities/realtime', { limit, sync });
   },
 
+  getWorldDomesticBoard: async () => {
+    return apiClient.get('/commodities/world-domestic-board');
+  },
+
   crawlLive: async () => {
     return apiClient.post('/commodities/crawl-live');
   }
