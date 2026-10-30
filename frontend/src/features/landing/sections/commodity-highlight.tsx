@@ -1,20 +1,37 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { Coffee, Apple, TreePine, Leaf, ArrowRight } from "lucide-react"
+import { Coffee, Leaf, ArrowRight, RefreshCw } from "lucide-react"
 import { Container } from "@/components/layout/container"
 import { Section } from "@/components/layout/section"
 import { Button } from "@/components/ui/button"
+import { commoditiesService } from "@/api/services/commodities.service"
 import { cn } from "@/lib/utils"
 
 export function CommodityHighlight({ initialData = [] }: { initialData?: any[] }) {
-  const itemsToDisplay = initialData.length > 0 ? initialData.slice(0, 4).map((item: any) => {
+  // Tự động fetch dữ liệu thời gian thực từ API nếu SSR chưa có hoặc để giữ giá luôn mới nhất
+  const { data: queryData, isLoading } = useQuery({
+    queryKey: ["home-commodities-highlight"],
+    queryFn: async () => {
+      const res = await commoditiesService.getCommodities({ page: 1, size: 8 })
+      return res?.data?.items || []
+    },
+    initialData: initialData.length > 0 ? initialData : undefined,
+    staleTime: 30 * 1000, // 30s
+    refetchInterval: 60 * 1000, // Tự động cập nhật mỗi 1 phút
+  })
+
+  const rawList = (queryData && queryData.length > 0) ? queryData : initialData
+
+  const itemsToDisplay = rawList.slice(0, 4).map((item: any) => {
     const isUp = (item.price_change ?? item.change_24h ?? 0) >= 0;
     const priceChange = item.price_change ?? item.change_24h ?? 0;
     const changeText = item.price_change_percent != null 
       ? `${isUp ? "+" : ""}${Number(item.price_change_percent).toFixed(2)}%`
-      : priceChange !== 0 ? `${isUp ? "+" : ""}${priceChange.toLocaleString("vi-VN")} đ` : "N/A";
+      : priceChange !== 0 ? `${isUp ? "+" : ""}${priceChange.toLocaleString("vi-VN")} đ` : "0.00%";
       
     // Determine color based on category/name
     let icon = Leaf;
@@ -30,15 +47,15 @@ export function CommodityHighlight({ initialData = [] }: { initialData?: any[] }
     return {
       id: item.id,
       name: item.name,
-      price: item.current_price != null ? item.current_price.toLocaleString("vi-VN") : "--",
+      price: item.current_price != null ? Number(item.current_price).toLocaleString("vi-VN") : "--",
       change: changeText,
       isUp,
       icon,
       color,
       bg,
-      unit: item.unit || "VND / kg"
+      unit: item.unit || "kg"
     };
-  }) : [];
+  });
 
   return (
     <Section>

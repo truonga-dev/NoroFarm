@@ -21,14 +21,13 @@ async def register(data: Register, db: AsyncSession = Depends(get_db)):
 async def login(data: Login, response: Response, db: AsyncSession = Depends(get_db)):
     auth_service = AuthService(db)
     token = await auth_service.login(data)
-    is_prod = settings.ENVIRONMENT == "production"
-    # Set HttpOnly cookies
+    # Set HttpOnly cookies - secure=False khi chạy HTTP (chưa cấu hình HTTPS/SSL)
     response.set_cookie(
         key="access_token",
         value=token.access_token,
         httponly=True,
-        secure=is_prod,
-        samesite="lax" if not is_prod else "lax",
+        secure=False,
+        samesite="lax",
         max_age=30 * 24 * 3600,  # 30 days
     )
     if token.refresh_token:
@@ -36,8 +35,8 @@ async def login(data: Login, response: Response, db: AsyncSession = Depends(get_
             key="refresh_token",
             value=token.refresh_token,
             httponly=True,
-            secure=is_prod,
-            samesite="lax" if not is_prod else "lax",
+            secure=False,
+            samesite="lax",
             max_age=7 * 24 * 3600,  # 7 days
         )
 
