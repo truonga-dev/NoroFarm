@@ -81,6 +81,60 @@ class ShopService:
             "pages": pages
         }
 
+    async def admin_get_products(
+        self,
+        page: int = 1,
+        size: int = 10,
+        category_id: Optional[int] = None,
+        search: Optional[str] = None,
+        is_active: Optional[bool] = None,
+        stock_status: Optional[str] = None,
+        sort: str = "newest",
+        low_stock_threshold: int = 20,
+    ):
+        """Danh sách sản phẩm cho Admin: gồm cả sản phẩm ngừng bán, có bộ lọc & sắp xếp."""
+        query = select(Product).options(selectinload(Product.category))
+
+        if category_id:
+            query = query.filter(Product.category_id == category_id)
+        if search:
+            query = query.filter(Product.name.ilike(f"%{search.strip()}%"))
+        if is_active is not None:
+            query = query.filter(Product.is_active == is_active)
+        if stock_status == "out":
+            query = query.filter(Product.stock <= 0)
+        elif stock_status == "low":
+            query = query.filter(Product.stock > 0, Product.stock <= low_stock_threshold)
+        elif stock_status == "in":
+            query = query.filter(Product.stock > low_stock_threshold)
+
+        count_query = select(func.count()).select_from(query.subquery())
+        total = await self.db.scalar(count_query) or 0
+
+        sort_map = {
+            "newest": Product.id.desc(),
+            "oldest": Product.id.asc(),
+            "name_asc": Product.name.asc(),
+            "name_desc": Product.name.desc(),
+            "price_asc": Product.price.asc(),
+            "price_desc": Product.price.desc(),
+            "stock_asc": Product.stock.asc(),
+            "stock_desc": Product.stock.desc(),
+        }
+        query = query.order_by(sort_map.get(sort, Product.id.desc()))
+        query = query.offset((page - 1) * size).limit(size)
+        result = await self.db.execute(query)
+        items = result.scalars().all()
+
+        pages = (total + size - 1) // size if total else 0
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "size": size,
+            "pages": pages,
+        }
+
     async def get_product(self, id: int) -> Product:
         query = select(Product).options(selectinload(Product.category)).filter(Product.id == id)
         result = await self.db.execute(query)

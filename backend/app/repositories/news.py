@@ -95,14 +95,14 @@ class NewsRepository:
     async def create_article(self, article: Article) -> Article:
         self.db.add(article)
         await self.db.commit()
-        await self.db.refresh(article)
-        return article
+        loaded = await self.get_article_by_id(article.id)
+        return loaded or article
 
     async def update_article(self, article: Article) -> Article:
         self.db.add(article)
         await self.db.commit()
-        await self.db.refresh(article)
-        return article
+        loaded = await self.get_article_by_id(article.id)
+        return loaded or article
         
     async def increment_view(self, article: Article) -> None:
         article.view_count += 1

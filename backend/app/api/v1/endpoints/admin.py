@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.database import get_db
 from app.schemas.admin import (
@@ -17,7 +17,7 @@ from app.schemas.user import UserResponse
 from app.schemas.market import MarketPostListResponse
 from app.services.market import MarketService
 from app.models.market import PostStatus
-from app.schemas.shop import ProductCreate, ProductUpdate, ProductResponse, OrderResponse, OrderListResponse
+from app.schemas.shop import ProductCreate, ProductUpdate, ProductResponse, ProductListResponse, OrderResponse, OrderListResponse
 from app.services.shop import ShopService
 from app.models.shop import OrderStatus
 from sqlalchemy.future import select
@@ -241,6 +241,31 @@ async def admin_get_market_posts(
     return success_response(data=result)
 
 # --- Shop B2C Management ---
+@router.get("/products", response_model=ResponseModel[ProductListResponse])
+async def admin_get_products(
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+    search: Optional[str] = None,
+    category_id: Optional[int] = None,
+    is_active: Optional[bool] = None,
+    stock_status: Optional[str] = Query(None, pattern="^(in|low|out)$"),
+    sort: str = Query("newest", pattern="^(newest|oldest|name_asc|name_desc|price_asc|price_desc|stock_asc|stock_desc)$"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(RoleChecker(["admin"]))
+):
+    """API danh sách sản phẩm cho Admin (gồm cả sản phẩm ngừng bán) với bộ lọc, sắp xếp và phân trang"""
+    service = ShopService(db)
+    result = await service.admin_get_products(
+        page=page,
+        size=size,
+        category_id=category_id,
+        search=search,
+        is_active=is_active,
+        stock_status=stock_status,
+        sort=sort,
+    )
+    return success_response(data=result)
+
 @router.post("/products", response_model=ResponseModel[ProductResponse])
 async def admin_create_product(
     data: ProductCreate,

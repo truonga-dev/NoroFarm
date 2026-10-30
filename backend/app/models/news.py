@@ -50,7 +50,7 @@ class Article(Base):
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     summary: Mapped[Optional[str]] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text)
-    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(255))
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(Text)
     
     # SEO
     meta_title: Mapped[Optional[str]] = mapped_column(String(255))
@@ -65,5 +65,5 @@ class Article(Base):
     category_id: Mapped[int] = mapped_column(ForeignKey("article_category.id", ondelete="RESTRICT"), index=True)
     author_id: Mapped[Optional[int]] = mapped_column(ForeignKey("user.id", ondelete="SET NULL"), index=True)
 
-    category: Mapped["ArticleCategory"] = relationship(back_populates="articles")
-    tags: Mapped[List["Tag"]] = relationship(secondary=article_tag, back_populates="articles")
+    category: Mapped["ArticleCategory"] = relationship(back_populates="articles", lazy="selectin")
+    tags: Mapped[List["Tag"]] = relationship(secondary=article_tag, back_populates="articles", lazy="selectin")

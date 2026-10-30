@@ -23,7 +23,10 @@ class NewsService:
         clean_text = normalize("NFD", text).encode("ascii", "ignore").decode("utf-8")
         clean_text = clean_text.lower()
         clean_text = re.sub(r'[^a-z0-9\s-]', '', clean_text)
-        return re.sub(r'[\s-]+', '-', clean_text).strip('-')
+        slug = re.sub(r'[\s-]+', '-', clean_text).strip('-')
+        if not slug:
+            slug = f"bai-viet-{int(datetime.now().timestamp())}"
+        return slug
 
     def _create_paginated_response(self, items: List[Any], total: int, params: PaginationParams) -> PaginatedResponse:
         pages = math.ceil(total / params.size) if total > 0 else 0
@@ -84,19 +87,36 @@ class NewsService:
         await self.repo.increment_view(article)
         return article
 
+    async def get_article_by_id(self, article_id: int) -> Article:
+        article = await self.repo.get_article_by_id(article_id)
+        if not article:
+            raise HTTPException(status_code=404, detail="Bài viết không tồn tại")
+        return article
+
     async def create_article(self, data: ArticleCreate, author_id: int) -> Article:
-        # Check and create fallback category if needed
-        category = await self.repo.get_category_by_id(data.category_id)
+        # Check and safely resolve category
+        category = None
+        if data.category_id:
+            category = await self.repo.get_category_by_id(data.category_id)
         if not category:
-            fallback = ArticleCategory(name="Chung", slug="chung", description="Chuyên mục chung", is_active=True)
-            new_cat = await self.repo.create_category(fallback)
-            data.category_id = new_cat.id
+            category = await self.repo.get_category_by_slug("chung")
+        if not category:
+            existing_cats = await self.repo.get_categories()
+            if existing_cats:
+                category = existing_cats[0]
+            else:
+                fallback = ArticleCategory(name="Chung", slug="chung", description="Chuyên mục chung", is_active=True)
+                category = await self.repo.create_category(fallback)
+        data.category_id = category.id
 
         slug = self._generate_slug(data.title)
         if await self.repo.get_article_by_slug(slug):
             slug = f"{slug}-{int(datetime.now().timestamp())}"
             
         article_data = data.model_dump(exclude={"tag_names"})
+        if "thumbnail_url" in article_data and (not article_data["thumbnail_url"] or not article_data["thumbnail_url"].strip()):
+            article_data["thumbnail_url"] = None
+
         article = Article(**article_data, slug=slug, author_id=author_id)
         
         if data.is_published:
@@ -114,11 +134,14 @@ class NewsService:
             
         update_data = data.model_dump(exclude_unset=True, exclude={"tag_names"})
         
-        if "title" in update_data and update_data["title"] != article.title:
+        if "title" in update_data and update_data["title"] and update_data["title"] != article.title:
             slug = self._generate_slug(update_data["title"])
             if await self.repo.get_article_by_slug(slug):
                 slug = f"{slug}-{int(datetime.now().timestamp())}"
             article.slug = slug
+
+        if "thumbnail_url" in update_data and (not update_data["thumbnail_url"] or (isinstance(update_data["thumbnail_url"], str) and not update_data["thumbnail_url"].strip())):
+            update_data["thumbnail_url"] = None
             
         for key, value in update_data.items():
             setattr(article, key, value)

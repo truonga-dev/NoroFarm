@@ -24,11 +24,42 @@ export function WeatherPreview() {
 
   useEffect(() => {
     if (activeLoc.query === "") {
+      const fallbackToIp = async () => {
+        try {
+          const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.latitude && data.longitude) {
+              setCoords({ lat: Number(data.latitude), lon: Number(data.longitude) });
+              return;
+            }
+          }
+        } catch {
+          try {
+            const res2 = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(4000) });
+            if (res2.ok) {
+              const data2 = await res2.json();
+              if (data2.latitude && data2.longitude) {
+                setCoords({ lat: Number(data2.latitude), lon: Number(data2.longitude) });
+              }
+            }
+          } catch {
+            // fallback fails silently
+          }
+        }
+      };
+
       if (typeof window !== "undefined" && "geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(
           (position) => setCoords({ lat: position.coords.latitude, lon: position.coords.longitude }),
-          (error) => console.log("Lỗi lấy vị trí: ", error)
+          () => {
+            // Fallback to IP geolocation when browser blocks GPS on HTTP
+            fallbackToIp();
+          },
+          { timeout: 5000 }
         );
+      } else {
+        fallbackToIp();
       }
     }
   }, [activeLoc.query]);

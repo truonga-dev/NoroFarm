@@ -1,15 +1,28 @@
 "use client"
 
+import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
-import { TrendingUp, ShoppingCart, Calendar } from "lucide-react"
+import { ShoppingCart, Calendar } from "lucide-react"
 import { Container } from "@/components/layout/container"
 import { Section } from "@/components/layout/section"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { marketService } from "@/api/services/market.service"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function MarketTrend({ initialData = [] }: { initialData?: any[] }) {
-  const posts = initialData
+  const { data: queryData, isLoading } = useQuery({
+    queryKey: ["home-market-trend"],
+    queryFn: async () => {
+      const res = await marketService.getPosts({ page: 1, size: 4 })
+      return res?.data?.items || (Array.isArray(res?.data) ? res?.data : []) || []
+    },
+    initialData: initialData.length > 0 ? initialData : undefined,
+    staleTime: 60 * 1000,
+  })
+
+  const posts = (queryData && queryData.length > 0) ? queryData : initialData
 
   return (
     <Section>
@@ -24,7 +37,17 @@ export function MarketTrend({ initialData = [] }: { initialData?: any[] }) {
           </Button>
         </div>
         
-        {posts.length === 0 ? (
+        {isLoading && posts.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="rounded-2xl border border-border/80 bg-card p-4 space-y-3">
+                <Skeleton className="aspect-[16/10] w-full rounded-xl" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : posts.length === 0 ? (
           <div className="text-center text-muted-foreground h-40 flex items-center justify-center bg-card rounded-2xl border">
             Chưa có tin đăng nào.
           </div>

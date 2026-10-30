@@ -6,7 +6,6 @@ import { CommodityHighlight } from '@/features/landing/sections/commodity-highli
 import { WeatherPreview } from '@/features/landing/sections/weather-preview'
 import { MarketTrend } from '@/features/landing/sections/market-trend'
 import { LatestNews } from '@/features/landing/sections/latest-news'
-import { MarketplacePreview } from '@/features/landing/sections/marketplace-preview'
 import { FeaturesSection } from '@/features/landing/sections/features-section'
 import { WhyChooseUs } from '@/features/landing/sections/why-choose-us'
 import { CtaSection } from '@/features/landing/sections/cta-section'
@@ -18,7 +17,13 @@ export const dynamic = 'force-dynamic'
 
 async function getHomeItems(path: string): Promise<any[]> {
   try {
-    const response = await fetch(`${API_URL}${path}`, {
+    const isServer = typeof window === 'undefined'
+    const baseUrl = isServer
+      ? (process.env.INTERNAL_API_URL || 'http://backend:8000/api/v1')
+      : (API_URL.startsWith('http') ? API_URL : `${window.location.origin}${API_URL}`)
+    const fullUrl = API_URL.startsWith('http') ? `${API_URL}${path}` : `${baseUrl}${path}`
+
+    const response = await fetch(fullUrl, {
       next: { revalidate: 60 },
       signal: AbortSignal.timeout(3000),
     })
@@ -42,17 +47,17 @@ function FeedFallback() {
 }
 
 async function CommodityFeed() {
-  const commodities = await getHomeItems('/commodities?size=4')
+  const commodities = await getHomeItems('/commodities?page=1&size=4')
   return <CommodityHighlight initialData={commodities} />
 }
 
 async function MarketFeed() {
-  const marketPosts = await getHomeItems('/market?size=4')
+  const marketPosts = await getHomeItems('/market?page=1&size=4')
   return <MarketTrend initialData={marketPosts} />
 }
 
 async function NewsFeed() {
-  const news = await getHomeItems('/news?skip=0&limit=3')
+  const news = await getHomeItems('/news?page=1&size=3')
   return <LatestNews initialData={news} />
 }
 

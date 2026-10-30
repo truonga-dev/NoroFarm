@@ -9,6 +9,10 @@ export const newsService = {
     return apiClient.get(`/news/${slug}`);
   },
 
+  getArticleById: async (id: number) => {
+    return apiClient.get(`/news/id/${id}`);
+  },
+
   createArticle: async (data: any) => {
     return apiClient.post('/news', data);
   },

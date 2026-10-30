@@ -43,13 +43,21 @@ async def get_articles(
     search: Optional[str] = None,
     category: Optional[str] = None,
     tag: Optional[str] = None,
+    is_published: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
     """API lấy danh sách bài viết (có phân trang, tìm kiếm, lọc)"""
     service = NewsService(db)
     params = PaginationParams(page=page, size=size, sort_by=sort_by, sort_desc=sort_desc)
-    result = await service.get_articles(params, search, category, tag, is_published=True)
+    result = await service.get_articles(params, search, category, tag, is_published=is_published)
     return success_response(data=result)
+
+@router.get("/id/{article_id}", response_model=ResponseModel[ArticleResponse])
+async def get_article_by_id(article_id: int, db: AsyncSession = Depends(get_db)):
+    """API lấy chi tiết bài viết theo ID"""
+    service = NewsService(db)
+    article = await service.get_article_by_id(article_id)
+    return success_response(data=article)
 
 @router.get("/{slug}", response_model=ResponseModel[ArticleResponse])
 async def get_article_by_slug(slug: str, db: AsyncSession = Depends(get_db)):

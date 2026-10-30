@@ -32,6 +32,17 @@ export const shopService = {
   },
 
   // Admin API
+  adminGetProducts: async (params?: {
+    page?: number;
+    size?: number;
+    search?: string;
+    category_id?: number;
+    is_active?: boolean;
+    stock_status?: 'in' | 'low' | 'out';
+    sort?: string;
+  }) => {
+    return apiClient.get('/admin/products', params);
+  },
   adminCreateProduct: async (data: any) => {
     return apiClient.post('/admin/products', data);
   },

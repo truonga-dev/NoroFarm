@@ -275,11 +275,50 @@ export default function WeatherPage() {
     currentQuery.isError && (gpsCoords || forecastQuery.isError)
 
   const useMyLocation = () => {
+    setGpsStatus('loading')
+
+    const fallbackToIp = async () => {
+      try {
+        const res = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(4000) })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.latitude && data.longitude) {
+            setGpsCoords({
+              latitude: Number(data.latitude),
+              longitude: Number(data.longitude),
+            })
+            setGpsStatus('active')
+            return true
+          }
+        }
+      } catch {
+        try {
+          const res2 = await fetch('https://ipwho.is/', { signal: AbortSignal.timeout(4000) })
+          if (res2.ok) {
+            const data2 = await res2.json()
+            if (data2.latitude && data2.longitude) {
+              setGpsCoords({
+                latitude: Number(data2.latitude),
+                longitude: Number(data2.longitude),
+              })
+              setGpsStatus('active')
+              return true
+            }
+          }
+        } catch {
+          // both fail
+        }
+      }
+      return false
+    }
+
     if (!navigator.geolocation) {
-      setGpsStatus('unavailable')
+      fallbackToIp().then((ok) => {
+        if (!ok) setGpsStatus('unavailable')
+      })
       return
     }
-    setGpsStatus('loading')
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setGpsCoords({
@@ -288,13 +327,17 @@ export default function WeatherPage() {
         })
         setGpsStatus('active')
       },
-      (error) => {
-        setGpsStatus(
-          error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable'
-        )
-        setGpsCoords(null)
+      async (error) => {
+        // Fallback to IP geolocation when browser blocks GPS on HTTP origins
+        const ok = await fallbackToIp()
+        if (!ok) {
+          setGpsStatus(
+            error.code === error.PERMISSION_DENIED ? 'denied' : 'unavailable'
+          )
+          setGpsCoords(null)
+        }
       },
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 10 * 60 * 1000 }
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 10 * 60 * 1000 }
     )
   }
 
@@ -362,10 +405,10 @@ export default function WeatherPage() {
               <p>
                 <strong>
                   {gpsStatus === 'denied'
-                    ? 'Quyền định vị chưa được cấp.'
-                    : 'Không thể xác định vị trí.'}
+                    ? 'Trình duyệt từ chối quyền định vị trên kết nối HTTP không bảo mật.'
+                    : 'Không thể xác định vị trí tự động.'}
                 </strong>{' '}
-                Bạn vẫn có thể chọn tỉnh hoặc vùng trong danh sách phía trên.
+                Để dùng GPS thiết bị, trình duyệt yêu cầu kết nối bảo mật HTTPS. Bạn có thể chọn trực tiếp tỉnh hoặc vùng canh tác trong danh sách phía trên.
               </p>
             </div>
           )}

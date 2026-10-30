@@ -1,5 +1,6 @@
 "use client"
 
+import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { Calendar, ArrowRight } from "lucide-react"
 import Link from "next/link"
@@ -7,10 +8,22 @@ import Image from "next/image"
 import { Container } from "@/components/layout/container"
 import { Section } from "@/components/layout/section"
 import { Button } from "@/components/ui/button"
+import { newsService } from "@/api/services/news.service"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 export function LatestNews({ initialData = [] }: { initialData?: any[] }) {
-  const articles = initialData
+  const { data: queryData, isLoading } = useQuery({
+    queryKey: ["home-latest-news"],
+    queryFn: async () => {
+      const res = await newsService.getArticles({ page: 1, size: 3 })
+      return res?.data?.items || res?.items || []
+    },
+    initialData: initialData.length > 0 ? initialData : undefined,
+    staleTime: 60 * 1000,
+  })
+
+  const articles = (queryData && queryData.length > 0) ? queryData : initialData
 
   return (
     <Section className="bg-muted/30">
@@ -25,7 +38,17 @@ export function LatestNews({ initialData = [] }: { initialData?: any[] }) {
           </Button>
         </div>
         
-        {articles.length === 0 ? (
+        {isLoading && articles.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="rounded-2xl border border-border/80 bg-card p-4 space-y-4">
+                <Skeleton className="aspect-[16/10] w-full rounded-xl" />
+                <Skeleton className="h-5 w-3/4" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            ))}
+          </div>
+        ) : articles.length === 0 ? (
           <div className="text-center text-muted-foreground h-40 flex items-center justify-center">
             Chưa có tin tức nào.
           </div>
@@ -82,4 +105,3 @@ export function LatestNews({ initialData = [] }: { initialData?: any[] }) {
     </Section>
   )
 }
-
